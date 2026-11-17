@@ -319,12 +319,17 @@ app.delete('/api/admin/media/:id', requireAuth, (req, res) => {
   }
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🚀 خادم مكتب أبونا 3D يعمل الآن بنجاح!`);
-  console.log(`🌐 الواجهة العامة للمكتب: http://localhost:${PORT}`);
-  console.log(`🔑 لوحة تحكم الأدمن:    http://localhost:${PORT}/admin`);
-  console.log(`🚪 صفحة تسجيل الدخول:   http://localhost:${PORT}/login`);
-  console.log(`===============================================`);
-});
+// Start Server if not on Vercel
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🚀 خادم مكتب أبونا 3D يعمل الآن بنجاح!`);
+    console.log(`🌐 الواجهة العامة للمكتب: http://localhost:${PORT}`);
+    console.log(`🔑 لوحة تحكم الأدمن:    http://localhost:${PORT}/admin`);
+    console.log(`🚪 صفحة تسجيل الدخول:   http://localhost:${PORT}/login`);
+    console.log(`===============================================`);
+  });
+}
+
+module.exports = app;
+
