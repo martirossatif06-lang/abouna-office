@@ -1403,8 +1403,14 @@ class OfficeScene {
   }
 
   // --- Day / Night Lighting Transition ---
-  toggleDayNight() {
-    this.isNightMode = !this.isNightMode;
+  toggleDayNight(forcedMode = null) {
+    if (forcedMode === 'day') {
+      this.isNightMode = false;
+    } else if (forcedMode === 'night') {
+      this.isNightMode = true;
+    } else {
+      this.isNightMode = !this.isNightMode;
+    }
 
     this.playSound('switch');
     document.body.setAttribute('data-theme', this.isNightMode ? 'night' : 'day');
