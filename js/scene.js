@@ -1,6 +1,6 @@
 // ==========================================
 // 3D REAL OFFICE SCENE (Three.js + GSAP)
-// كل ضلفة ودرج في المكتب يفتح بحركة فيزيائية 3D حقيقية!
+// محاكاة طبيعية ثلاثية الأبعاد بعمق حقيقي وفيزياء فتح وإغلاق للأبواب والأدراج
 // ==========================================
 
 class OfficeScene {
@@ -22,18 +22,17 @@ class OfficeScene {
 
     // Lighting
     this.ambientLight = null;
+    this.hemiLight = null;
     this.sunLight = null;
     this.lampLight = null;
-    this.windowLight = null;
     this.isNightMode = false;
 
     // Registry of all interactive doors & drawers
-    // { id, pivot, openRotation, closedRotation, isOpen, itemData }
     this.doorRegistry = {};
 
-    // Initial Overview Camera
-    this.defaultCameraPos = new THREE.Vector3(0, 8.5, 11);
-    this.defaultCameraLookAt = new THREE.Vector3(0, 2.0, 0);
+    // Human Perspective Camera (Eye-level standing in room)
+    this.defaultCameraPos = new THREE.Vector3(0, 5.6, 9.6);
+    this.defaultCameraLookAt = new THREE.Vector3(0, 1.8, 0.2);
 
     this.audioEnabled = true;
 
@@ -42,14 +41,15 @@ class OfficeScene {
 
   init() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf5efe6);
-    this.scene.fog = new THREE.FogExp2(0xf5efe6, 0.02);
+    this.scene.background = new THREE.Color(0xf6f1e8);
+    this.scene.fog = new THREE.FogExp2(0xf6f1e8, 0.018);
 
-    this.camera = new THREE.PerspectiveCamera(40, this.width / this.height, 0.1, 100);
+    // Natural human perspective FOV (48°)
+    this.camera = new THREE.PerspectiveCamera(48, this.width / this.height, 0.1, 80);
     this.camera.position.copy(this.defaultCameraPos);
     this.camera.lookAt(this.defaultCameraLookAt);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(this.width, this.height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -60,23 +60,23 @@ class OfficeScene {
 
     this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
+    this.controls.dampingFactor = 0.06;
     this.controls.target.copy(this.defaultCameraLookAt);
     this.controls.maxPolarAngle = Math.PI / 2.05;
-    this.controls.minDistance = 2.5;
-    this.controls.maxDistance = 18;
+    this.controls.minDistance = 1.2;
+    this.controls.maxDistance = 17;
     this.controls.enablePan = false;
 
     this.setupLighting();
     this.buildRoomArchitecture();
 
-    // بناء الأثاث مع تزويد كل ضلفة بمفصلات حقيقية ومحتويات ثلاثية الأبعاد بداخلها
+    // بناء الأثاث مع تجاويف حقيقية وأعماق ملموسة ورفوف داخلية
     this.buildEntranceWall();
     this.buildWindowAndDeskWall();
     this.buildGrandThreeSectionCabinet();
     this.buildFourGlassLibraryCabinet();
 
-    // Track pointer to prevent drag from triggering click
+    // Track pointer
     this.pointerDownPos = { x: 0, y: 0, time: 0 };
     this.lastTap = { time: 0, itemId: null };
 
@@ -100,59 +100,136 @@ class OfficeScene {
   playSound(type) {
     if (!this.audioEnabled) return;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = window._audioCtx || (window._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      const now = ctx.currentTime;
 
-      if (type === 'click') {
-        osc.frequency.setValueAtTime(550, now);
-        osc.frequency.exponentialRampToValueAtTime(160, now + 0.07);
-        gain.gain.setValueAtTime(0.12, now);
+      if (type === 'door') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.35);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } else if (type === 'click') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        gain.gain.setValueAtTime(0.08, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
         osc.start(now);
         osc.stop(now + 0.07);
-      } else if (type === 'door') {
-        osc.frequency.setValueAtTime(120, now);
-        osc.frequency.linearRampToValueAtTime(75, now + 0.28);
-        gain.gain.setValueAtTime(0.09, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
-        osc.start(now);
-        osc.stop(now + 0.28);
       } else if (type === 'switch') {
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.setValueAtTime(750, now);
         gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
         osc.start(now);
-        osc.stop(now + 0.05);
+        osc.stop(now + 0.06);
       }
     } catch (e) {}
   }
 
-  // --- Lighting Setup ---
+  // --- Lighting Setup with Natural Ambient Occlusion and Sharp Depth Shadows ---
   setupLighting() {
-    this.ambientLight = new THREE.AmbientLight(0xfff5ea, 0.85);
+    // 1. Warm Soft Ambient Light
+    this.ambientLight = new THREE.AmbientLight(0xfff6ec, 0.42);
     this.scene.add(this.ambientLight);
 
-    this.sunLight = new THREE.DirectionalLight(0xfffaed, 1.25);
-    this.sunLight.position.set(10, 8, 1);
+    // 2. Hemisphere Light: Natural ceiling bounce vs dark floor shadows for depth
+    this.hemiLight = new THREE.HemisphereLight(0xfffaed, 0x3d3028, 0.48);
+    this.scene.add(this.hemiLight);
+
+    // 3. Sun Light (Window Direction) with proper wide frustum for room-wide shadows
+    this.sunLight = new THREE.DirectionalLight(0xfff8ee, 1.35);
+    this.sunLight.position.set(8.5, 7.5, 2.0);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
-    this.sunLight.shadow.bias = -0.0005;
+    this.sunLight.shadow.camera.near = 0.5;
+    this.sunLight.shadow.camera.far = 28;
+    this.sunLight.shadow.camera.left = -9;
+    this.sunLight.shadow.camera.right = 9;
+    this.sunLight.shadow.camera.top = 9;
+    this.sunLight.shadow.camera.bottom = -9;
+    this.sunLight.shadow.bias = -0.0003;
+    this.sunLight.shadow.normalBias = 0.02;
     this.scene.add(this.sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xd4e6f1, 0.3);
-    fillLight.position.set(-6, 8, -6);
+    // 4. Soft Fill Light from opposite room corner
+    const fillLight = new THREE.DirectionalLight(0xdce8f5, 0.35);
+    fillLight.position.set(-7, 6.5, -5);
     this.scene.add(fillLight);
 
-    this.lampLight = new THREE.PointLight(0xffb74d, 0.4, 7, 1.8);
-    this.lampLight.position.set(2.8, 2.5, 0.2);
+    // 5. Desk Lamp Point Light
+    this.lampLight = new THREE.PointLight(0xffb74d, 0.55, 6.5, 1.9);
+    this.lampLight.position.set(2.6, 2.3, 0.5);
     this.lampLight.castShadow = true;
+    this.lampLight.shadow.bias = -0.001;
     this.scene.add(this.lampLight);
+  }
+
+  // --- Procedural Parquet Floor Texture for Realistic Perspective Depth Lines ---
+  createParquetTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#b78952';
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    const plankH = 32;
+    const plankW = 128;
+    const tones = ['#c2945d', '#b3844a', '#bb8e55', '#aa7a41', '#cb9e68'];
+
+    for (let y = 0; y < 1024; y += plankH) {
+      const shift = (Math.floor(y / plankH) % 2) * (plankW / 2);
+      for (let x = -shift; x < 1024 + plankW; x += plankW) {
+        ctx.fillStyle = tones[Math.floor(Math.random() * tones.length)];
+        ctx.fillRect(x + 1, y + 1, plankW - 2, plankH - 2);
+
+        // subtle wood plank grain lines
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+        ctx.fillRect(x + 1, y + plankH / 2, plankW - 2, 1);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.fillRect(x + 1, y + 2, plankW - 2, 1);
+      }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(5, 5);
+    return texture;
+  }
+
+  // --- Soft Contact Shadow Helper to Anchor Objects firmly to Floor ---
+  createContactShadow(w, d, opacity = 0.35) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createRadialGradient(64, 64, 12, 64, 64, 64);
+    grad.addColorStop(0, `rgba(0, 0, 0, ${opacity})`);
+    grad.addColorStop(0.65, `rgba(0, 0, 0, ${opacity * 0.4})`);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.y = 0.005;
+    return plane;
   }
 
   // --- Room Architecture ---
@@ -161,34 +238,47 @@ class OfficeScene {
     const roomLength = 9;
     const roomHeight = 4.8;
 
+    // Floor with Parquet Wood Planks
     const floorGeo = new THREE.PlaneGeometry(roomWidth, roomLength);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0xd7ba89, roughness: 0.4, metalness: 0.05 });
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: this.createParquetTexture(),
+      roughness: 0.38,
+      metalness: 0.05
+    });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
 
-    const rugGeo = new THREE.PlaneGeometry(5.2, 5.0);
-    const rugMat = new THREE.MeshStandardMaterial({ color: 0x933b27, roughness: 0.85 });
+    // Oriental Carpet with Depth Borders
+    const rugGeo = new THREE.PlaneGeometry(5.4, 4.8);
+    const rugMat = new THREE.MeshStandardMaterial({ color: 0x8b2e1e, roughness: 0.9 });
     const rug = new THREE.Mesh(rugGeo, rugMat);
     rug.rotation.x = -Math.PI / 2;
-    rug.position.set(0, 0.01, 0);
+    rug.position.set(0, 0.01, 0.1);
     rug.receiveShadow = true;
     this.scene.add(rug);
 
-    const rugBorder = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 4.6), new THREE.MeshStandardMaterial({ color: 0xb7950b, roughness: 0.8 }));
+    const rugBorder = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.0, 4.4),
+      new THREE.MeshStandardMaterial({ color: 0xc8963e, roughness: 0.85 })
+    );
     rugBorder.rotation.x = -Math.PI / 2;
-    rugBorder.position.set(0, 0.015, 0);
+    rugBorder.position.set(0, 0.015, 0.1);
     rugBorder.receiveShadow = true;
     this.scene.add(rugBorder);
 
-    const rugInner = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 4.3), new THREE.MeshStandardMaterial({ color: 0x78281f, roughness: 0.85 }));
+    const rugInner = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.7, 4.1),
+      new THREE.MeshStandardMaterial({ color: 0x6e2216, roughness: 0.9 })
+    );
     rugInner.rotation.x = -Math.PI / 2;
-    rugInner.position.set(0, 0.02, 0);
+    rugInner.position.set(0, 0.02, 0.1);
     rugInner.receiveShadow = true;
     this.scene.add(rugInner);
 
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1ebe1, roughness: 0.85 });
+    // Walls
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf3ede3, roughness: 0.88 });
 
     const northWall = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, roomHeight, 0.2), wallMat);
     northWall.position.set(0, roomHeight / 2, -roomLength / 2);
@@ -205,17 +295,18 @@ class OfficeScene {
     eastWall.receiveShadow = true;
     this.scene.add(eastWall);
 
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-    const nBase = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.25, 0.08), baseMat);
-    nBase.position.set(0, 0.125, -roomLength / 2 + 0.1);
+    // Baseboards
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
+    const nBase = new THREE.Mesh(new THREE.BoxGeometry(roomWidth, 0.22, 0.06), baseMat);
+    nBase.position.set(0, 0.11, -roomLength / 2 + 0.1);
     this.scene.add(nBase);
 
-    const wBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, roomLength), baseMat);
-    wBase.position.set(-roomWidth / 2 + 0.1, 0.125, 0);
+    const wBase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, roomLength), baseMat);
+    wBase.position.set(-roomWidth / 2 + 0.1, 0.11, 0);
     this.scene.add(wBase);
 
-    const eBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, roomLength), baseMat);
-    eBase.position.set(roomWidth / 2 - 0.1, 0.125, 0);
+    const eBase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, roomLength), baseMat);
+    eBase.position.set(roomWidth / 2 - 0.1, 0.11, 0);
     this.scene.add(eBase);
   }
 
@@ -237,7 +328,7 @@ class OfficeScene {
   }
 
   // --- Helper to Register an Animated Drawer ---
-  registerDrawer(id, drawerGroup, mesh, itemData, pullDistance = 0.45) {
+  registerDrawer(id, drawerGroup, mesh, itemData, pullDistance = 0.5) {
     this.doorRegistry[id] = {
       drawer: drawerGroup,
       isOpen: false,
@@ -254,23 +345,23 @@ class OfficeScene {
 
   // ==========================================
   // 1. حائط الباب (الشمال):
-  // [الباب عند جهة الدولاب] -> [الكنبة] -> [دولاب التواني] -> [التلاجة]
+  // [باب المكتب] -> [الكنبة] -> [دولاب التواني المفرغ بعمق ورفوف] -> [التلاجة]
   // ==========================================
   buildEntranceWall() {
     const wallZ = -4.35;
-    const woodClassic = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.45 });
-    const woodInner = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.5 });
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.8 });
+    const woodClassic = new THREE.MeshStandardMaterial({ color: 0x54382e, roughness: 0.45 });
+    const woodInner = new THREE.MeshStandardMaterial({ color: 0x3d2720, roughness: 0.6 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.85 });
 
-    // A. باب المكتب (يفتح للداخل عند الضغط عليه!)
+    // A. باب المكتب
     const doorGroup = new THREE.Group();
     doorGroup.position.set(-3.7, 0, wallZ);
 
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 3.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.5 }));
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.3, 3.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x38221b, roughness: 0.5 }));
     frame.position.set(0, 1.6, 0);
+    frame.castShadow = true;
     doorGroup.add(frame);
 
-    // Door Leaf Pivot
     const doorPivot = new THREE.Group();
     doorPivot.position.set(-0.55, 1.6, 0.02);
 
@@ -279,7 +370,7 @@ class OfficeScene {
     doorLeaf.castShadow = true;
     doorPivot.add(doorLeaf);
 
-    const doorHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 12), handleMat);
+    const doorHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.18, 12), handleMat);
     doorHandle.position.set(1.0, -0.1, 0.06);
     doorLeaf.add(doorHandle);
 
@@ -297,10 +388,11 @@ class OfficeScene {
     // B. كنبة الزوار
     const sofaGroup = new THREE.Group();
     sofaGroup.position.set(-1.8, 0, wallZ + 0.65);
-    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.7 });
+    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.72 });
     const sofaSeat = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.45, 0.85), sofaMat);
     sofaSeat.position.set(0, 0.45, 0);
     sofaSeat.castShadow = true;
+    sofaSeat.receiveShadow = true;
     sofaGroup.add(sofaSeat);
 
     const sofaBack = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.7, 0.25), sofaMat);
@@ -311,13 +403,20 @@ class OfficeScene {
     const armGeo = new THREE.BoxGeometry(0.2, 0.65, 0.85);
     const armL = new THREE.Mesh(armGeo, sofaMat);
     armL.position.set(-0.95, 0.65, 0);
+    armL.castShadow = true;
     sofaGroup.add(armL);
     const armR = new THREE.Mesh(armGeo, sofaMat);
     armR.position.set(0.95, 0.65, 0);
+    armR.castShadow = true;
     sofaGroup.add(armR);
+
+    // Contact shadow under sofa
+    const sofaShadow = this.createContactShadow(2.4, 1.2, 0.4);
+    sofaShadow.position.set(0, 0.005, 0);
+    sofaGroup.add(sofaShadow);
     this.scene.add(sofaGroup);
 
-    // C. دولاب أبونا الخاص (ضرفتين طوال للتواني + ضرفتين مربعين بوكس للأباركة)
+    // C. دولاب أبونا الخاص (تجويف حقيقي بعمق 75 سم + رفوف + شماعة وتواني داخلية!)
     const vestmentGroup = new THREE.Group();
     vestmentGroup.position.set(1.1, 0, wallZ + 0.45);
 
@@ -325,57 +424,100 @@ class OfficeScene {
     const cabHeight = 3.6;
     const cabDepth = 0.75;
 
-    // Outer Cabinet Shell
-    const cabBody = new THREE.Mesh(new THREE.BoxGeometry(cabWidth, cabHeight, cabDepth), woodClassic);
-    cabBody.position.set(0, cabHeight / 2, 0);
-    cabBody.castShadow = true;
-    cabBody.receiveShadow = true;
-    vestmentGroup.add(cabBody);
+    // Contact shadow
+    vestmentGroup.add(this.createContactShadow(cabWidth + 0.3, cabDepth + 0.3, 0.45));
 
-    // الداخلية (Inside the wardrobe):
-    // شماعة ملابس كهنوتية + توني أبيض وأسود معلق
-    const hangerRod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, cabWidth - 0.1, 12), handleMat);
+    // Outer Shell (Hollow Cavity: Back + Left Wall + Right Wall + Top + Bottom)
+    // 1. Back panel
+    const cabBack = new THREE.Mesh(new THREE.BoxGeometry(cabWidth, cabHeight, 0.04), woodInner);
+    cabBack.position.set(0, cabHeight / 2, -cabDepth / 2 + 0.02);
+    cabBack.receiveShadow = true;
+    vestmentGroup.add(cabBack);
+
+    // 2. Left side wall (Shows full 75cm depth!)
+    const cabLeft = new THREE.Mesh(new THREE.BoxGeometry(0.04, cabHeight, cabDepth), woodClassic);
+    cabLeft.position.set(-cabWidth / 2 + 0.02, cabHeight / 2, 0);
+    cabLeft.castShadow = true;
+    cabLeft.receiveShadow = true;
+    vestmentGroup.add(cabLeft);
+
+    // 3. Right side wall (Shows full 75cm depth!)
+    const cabRight = new THREE.Mesh(new THREE.BoxGeometry(0.04, cabHeight, cabDepth), woodClassic);
+    cabRight.position.set(cabWidth / 2 - 0.02, cabHeight / 2, 0);
+    cabRight.castShadow = true;
+    cabRight.receiveShadow = true;
+    vestmentGroup.add(cabRight);
+
+    // 4. Top & Bottom panels
+    const cabTop = new THREE.Mesh(new THREE.BoxGeometry(cabWidth, 0.04, cabDepth), woodClassic);
+    cabTop.position.set(0, cabHeight - 0.02, 0);
+    cabTop.castShadow = true;
+    vestmentGroup.add(cabTop);
+
+    const cabBottom = new THREE.Mesh(new THREE.BoxGeometry(cabWidth, 0.06, cabDepth), woodClassic);
+    cabBottom.position.set(0, 0.03, 0);
+    cabBottom.receiveShadow = true;
+    vestmentGroup.add(cabBottom);
+
+    // 5. Middle dividing shelf separating tall lower section from top box
+    const lowerDoorH = 2.4;
+    const midShelf = new THREE.Mesh(new THREE.BoxGeometry(cabWidth - 0.08, 0.04, cabDepth - 0.05), woodInner);
+    midShelf.position.set(0, lowerDoorH + 0.02, 0);
+    midShelf.receiveShadow = true;
+    midShelf.castShadow = true;
+    vestmentGroup.add(midShelf);
+
+    // Interior contents inside the deep cavity:
+    // Hanger rod
+    const hangerRod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, cabWidth - 0.12, 12), handleMat);
     hangerRod.rotation.z = Math.PI / 2;
-    hangerRod.position.set(0, 2.1, 0);
+    hangerRod.position.set(0, lowerDoorH - 0.15, 0);
     vestmentGroup.add(hangerRod);
 
-    // مجسم التوني الأبيض الكهنوتي المعلق بالداخل
-    const tunicWhite = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 0.15), new THREE.MeshStandardMaterial({ color: 0xfdfefe, roughness: 0.6 }));
-    tunicWhite.position.set(-0.35, 1.35, 0);
+    // Priest tunics hanging inside the deep space
+    const tunicWhite = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 1.5, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.6 })
+    );
+    tunicWhite.position.set(-0.35, 1.25, 0);
+    tunicWhite.castShadow = true;
+    tunicWhite.receiveShadow = true;
     vestmentGroup.add(tunicWhite);
 
-    // مجسم التوني الأسود الكهنوتي المعلق بالداخل
-    const tunicBlack = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 0.15), new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.6 }));
-    tunicBlack.position.set(0.35, 1.35, 0);
+    const tunicBlack = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 1.5, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.6 })
+    );
+    tunicBlack.position.set(0.35, 1.25, 0);
+    tunicBlack.castShadow = true;
+    tunicBlack.receiveShadow = true;
     vestmentGroup.add(tunicBlack);
 
-    // كاس وقارورة الأباركة في الرف العلوي البوكس
-    const chalice = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.22, 12), handleMat);
-    chalice.position.set(-0.25, 2.8, 0.1);
-    vestmentGroup.add(chalice);
+    // Top Box interior shelf contents (Censer, Liturgical boxes)
+    const boxContent = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.25, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0xb7950b, roughness: 0.3, metalness: 0.7 })
+    );
+    boxContent.position.set(-0.35, lowerDoorH + 0.45, 0);
+    vestmentGroup.add(boxContent);
 
-    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.28, 12), new THREE.MeshStandardMaterial({ color: 0x78281f }));
-    bottle.position.set(0.25, 2.8, 0.1);
-    vestmentGroup.add(bottle);
+    // --- الضرفتين الطوال التحتانيين (للروتين والتواني) ---
+    const doorW = cabWidth / 2 - 0.03;
+    const doorThick = 0.04;
 
-    // --- الضرفتين الطوال التحتانيين (لتواني أبونا) ---
-    const lowerDoorH = 2.4;
-    const doorW = cabWidth / 2 - 0.04;
+    const doorPivotL = new THREE.Group();
+    doorPivotL.position.set(-cabWidth / 2 + 0.02, lowerDoorH / 2 + 0.02, cabDepth / 2);
+    const doorL = new THREE.Mesh(new THREE.BoxGeometry(doorW, lowerDoorH - 0.02, doorThick), woodClassic);
+    doorL.position.set(doorW / 2, 0, 0);
+    doorL.castShadow = true;
+    doorPivotL.add(doorL);
 
-    // ضلفة التواني الشمال
-    const vPivotL = new THREE.Group();
-    vPivotL.position.set(-cabWidth / 2 + 0.03, lowerDoorH / 2 + 0.08, cabDepth / 2);
-    const vDoorLeft = new THREE.Mesh(new THREE.BoxGeometry(doorW, lowerDoorH, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.4 }));
-    vDoorLeft.position.set(doorW / 2, 0, 0);
-    vDoorLeft.castShadow = true;
-    vPivotL.add(vDoorLeft);
+    const hL = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
+    hL.position.set(doorW - 0.06, 0, 0.04);
+    doorL.add(hL);
+    vestmentGroup.add(doorPivotL);
 
-    const vHandleL = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
-    vHandleL.position.set(doorW - 0.06, 0, 0.05);
-    vDoorLeft.add(vHandleL);
-    vestmentGroup.add(vPivotL);
-
-    this.registerDoor('vestment_door_left', vPivotL, 'left', vDoorLeft, {
+    this.registerDoor('vestment_left', doorPivotL, 'left', doorL, {
       id: 'cabinet_door',
       name: 'ضلفة توانى أبونا (يسار) — اضغط للفتح 3D',
       section: 'bio',
@@ -383,20 +525,19 @@ class OfficeScene {
       focusLookAt: new THREE.Vector3(1.1, 1.6, wallZ + 0.45)
     });
 
-    // ضلفة التواني اليمين
-    const vPivotR = new THREE.Group();
-    vPivotR.position.set(cabWidth / 2 - 0.03, lowerDoorH / 2 + 0.08, cabDepth / 2);
-    const vDoorRight = new THREE.Mesh(new THREE.BoxGeometry(doorW, lowerDoorH, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.4 }));
-    vDoorRight.position.set(-doorW / 2, 0, 0);
-    vDoorRight.castShadow = true;
-    vPivotR.add(vDoorRight);
+    const doorPivotR = new THREE.Group();
+    doorPivotR.position.set(cabWidth / 2 - 0.02, lowerDoorH / 2 + 0.02, cabDepth / 2);
+    const doorR = new THREE.Mesh(new THREE.BoxGeometry(doorW, lowerDoorH - 0.02, doorThick), woodClassic);
+    doorR.position.set(-doorW / 2, 0, 0);
+    doorR.castShadow = true;
+    doorPivotR.add(doorR);
 
-    const vHandleR = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
-    vHandleR.position.set(-doorW + 0.06, 0, 0.05);
-    vDoorRight.add(vHandleR);
-    vestmentGroup.add(vPivotR);
+    const hR = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
+    hR.position.set(-doorW + 0.06, 0, 0.04);
+    doorR.add(hR);
+    vestmentGroup.add(doorPivotR);
 
-    this.registerDoor('vestment_door_right', vPivotR, 'right', vDoorRight, {
+    this.registerDoor('vestment_right', doorPivotR, 'right', doorR, {
       id: 'cabinet_door',
       name: 'ضلفة توانى أبونا (يمين) — اضغط للفتح 3D',
       section: 'bio',
@@ -405,13 +546,14 @@ class OfficeScene {
     });
 
     // --- الضرفتين المربعين البوكس الفوقانيين (للأباركة) ---
-    const boxH = 0.95;
-    const boxY = lowerDoorH + boxH / 2 + 0.12;
+    const boxH = cabHeight - lowerDoorH - 0.08;
+    const boxY = lowerDoorH + boxH / 2 + 0.04;
 
     const boxPivotL = new THREE.Group();
-    boxPivotL.position.set(-cabWidth / 2 + 0.03, boxY, cabDepth / 2);
-    const boxDoorL = new THREE.Mesh(new THREE.BoxGeometry(doorW, boxH, 0.05), new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.4 }));
+    boxPivotL.position.set(-cabWidth / 2 + 0.02, boxY, cabDepth / 2);
+    const boxDoorL = new THREE.Mesh(new THREE.BoxGeometry(doorW, boxH, doorThick), woodClassic);
     boxDoorL.position.set(doorW / 2, 0, 0);
+    boxDoorL.castShadow = true;
     boxPivotL.add(boxDoorL);
     vestmentGroup.add(boxPivotL);
 
@@ -419,14 +561,15 @@ class OfficeScene {
       id: 'cabinet_door',
       name: 'ضلفة الأباركة والصلوات (يسار) — اضغط للفتح 3D',
       section: 'bio',
-      focusPos: new THREE.Vector3(1.1, 2.6, -1.8),
-      focusLookAt: new THREE.Vector3(1.1, 2.7, wallZ + 0.45)
+      focusPos: new THREE.Vector3(1.1, 2.7, -1.8),
+      focusLookAt: new THREE.Vector3(1.1, 2.8, wallZ + 0.45)
     });
 
     const boxPivotR = new THREE.Group();
-    boxPivotR.position.set(cabWidth / 2 - 0.03, boxY, cabDepth / 2);
-    const boxDoorR = new THREE.Mesh(new THREE.BoxGeometry(doorW, boxH, 0.05), new THREE.MeshStandardMaterial({ color: 0x795548, roughness: 0.4 }));
+    boxPivotR.position.set(cabWidth / 2 - 0.02, boxY, cabDepth / 2);
+    const boxDoorR = new THREE.Mesh(new THREE.BoxGeometry(doorW, boxH, doorThick), woodClassic);
     boxDoorR.position.set(-doorW / 2, 0, 0);
+    boxDoorR.castShadow = true;
     boxPivotR.add(boxDoorR);
     vestmentGroup.add(boxPivotR);
 
@@ -434,28 +577,31 @@ class OfficeScene {
       id: 'cabinet_door',
       name: 'ضلفة مقتنيات الخدمة (يمين) — اضغط للفتح 3D',
       section: 'bio',
-      focusPos: new THREE.Vector3(1.1, 2.6, -1.8),
-      focusLookAt: new THREE.Vector3(1.1, 2.7, wallZ + 0.45)
+      focusPos: new THREE.Vector3(1.1, 2.7, -1.8),
+      focusLookAt: new THREE.Vector3(1.1, 2.8, wallZ + 0.45)
     });
 
     this.scene.add(vestmentGroup);
 
-    // D. التلاجة في زاوية الحائط (تفتح أيضاً بالضغط عليها!)
+    // D. التلاجة في زاوية الحائط
     const fridgeGroup = new THREE.Group();
     fridgeGroup.position.set(3.4, 0, wallZ + 0.55);
 
-    const fridgeMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.3, metalness: 0.4 });
+    fridgeGroup.add(this.createContactShadow(1.1, 1.0, 0.4));
+
+    const fridgeMat = new THREE.MeshStandardMaterial({ color: 0xe0e2e6, roughness: 0.28, metalness: 0.35 });
     const fridgeBody = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.45, 0.75), fridgeMat);
     fridgeBody.position.set(0, 0.725, 0);
     fridgeBody.castShadow = true;
+    fridgeBody.receiveShadow = true;
     fridgeGroup.add(fridgeBody);
 
-    // Fridge Door Pivot
     const fridgePivot = new THREE.Group();
     fridgePivot.position.set(-0.4, 0.725, 0.38);
 
     const fridgeDoor = new THREE.Mesh(new THREE.BoxGeometry(0.84, 1.42, 0.05), fridgeMat);
     fridgeDoor.position.set(0.42, 0, 0);
+    fridgeDoor.castShadow = true;
     fridgePivot.add(fridgeDoor);
 
     const frHandle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.3, 0.03), handleMat);
@@ -476,7 +622,7 @@ class OfficeScene {
 
   // ==========================================
   // 2. حائط الشباك والمكتب (اليمين):
-  // [التكييف] من فوق + [الشباك] تحته + [مكتب أبونا] قدامه والكرسيين
+  // [التكييف] من فوق + [الشباك] تحته + [مكتب أبونا بعمق ودرج منزلق 3D] والكرسيين
   // ==========================================
   buildWindowAndDeskWall() {
     const wallX = 4.88;
@@ -486,6 +632,7 @@ class OfficeScene {
     acGroup.position.set(wallX - 0.25, 4.0, 0.5);
     acGroup.rotation.y = -Math.PI / 2;
     const acBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.45, 0.32), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+    acBody.castShadow = true;
     acGroup.add(acBody);
 
     const acVent = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 0.05), new THREE.MeshStandardMaterial({ color: 0x95a5a6 }));
@@ -493,158 +640,223 @@ class OfficeScene {
     acGroup.add(acVent);
     this.scene.add(acGroup);
 
-    // الشباك
+    // الشباك مع إضاءة نافذة طبيعية
     const winGroup = new THREE.Group();
     winGroup.position.set(wallX - 0.06, 2.4, 0.5);
     winGroup.rotation.y = -Math.PI / 2;
     const winFrame = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.9, 0.1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }));
     winGroup.add(winFrame);
 
-    this.windowGlassMat = new THREE.MeshBasicMaterial({ color: 0xbde0fe });
+    this.windowGlassMat = new THREE.MeshBasicMaterial({ color: 0xcde5ff });
     const winGlass = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.7), this.windowGlassMat);
     winGlass.position.z = 0.055;
     winGroup.add(winGlass);
     this.scene.add(winGroup);
 
-    // مكتب أبونا والكرسيين
+    // مكتب أبونا والكرسيين مع عمق حقيقي
     const deskGroup = new THREE.Group();
     deskGroup.position.set(2.6, 0, 0.5);
     deskGroup.rotation.y = -Math.PI / 2;
 
-    const deskWood = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.35 });
-    const leatherMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.7 });
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.8 });
+    const deskWood = new THREE.MeshStandardMaterial({ color: 0x54382e, roughness: 0.35 });
+    const innerDeskWood = new THREE.MeshStandardMaterial({ color: 0x3d2720, roughness: 0.5 });
+    const leatherMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.72 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.85 });
 
-    const top = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 1.3), deskWood);
-    top.position.set(0, 1.8, 0);
+    // Contact shadow under desk & chairs
+    deskGroup.add(this.createContactShadow(3.2, 2.4, 0.5));
+
+    // سطح المكتب بسمك وأبعاد ملموسة
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.09, 1.25), deskWood);
+    top.position.set(0, 1.5, 0);
     top.castShadow = true;
     top.receiveShadow = true;
     deskGroup.add(top);
 
-    const sideL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.74, 1.2), deskWood);
-    sideL.position.set(-1.25, 0.87, 0);
+    // قوائم وجوانب المكتب (Left Leg & Modesty Panel)
+    const sideL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.45, 1.15), deskWood);
+    sideL.position.set(-1.18, 0.725, 0);
+    sideL.castShadow = true;
+    sideL.receiveShadow = true;
     deskGroup.add(sideL);
 
-    const sideR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.74, 1.2), deskWood);
-    sideR.position.set(1.25, 0.87, 0);
-    deskGroup.add(sideR);
-
-    const modestyPanel = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 0.05), deskWood);
-    modestyPanel.position.set(0, 1.15, -0.55);
+    const modestyPanel = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.0, 0.04), deskWood);
+    modestyPanel.position.set(0, 0.95, -0.52);
+    modestyPanel.castShadow = true;
     deskGroup.add(modestyPanel);
 
-    // كمودينو صغير بجوار المكتب (بدرج منزلق يفتح في 3D!)
-    const commode = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.9), deskWood);
-    commode.position.set(0.85, 0.65, 0);
-    deskGroup.add(commode);
+    // وحدة الأدراج (كمودينو) مفرغة مع درج ينزلق بالكامل للخارج بفيزياء حقيقية!
+    const pedW = 0.68;
+    const pedH = 1.35;
+    const pedD = 1.05;
+    const pedX = 0.84;
 
-    const commodeDrawerPivot = new THREE.Group();
-    commodeDrawerPivot.position.set(0.85, 0.95, 0.46);
-    const commodeDrawerMesh = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.35, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41 }));
-    commodeDrawerPivot.add(commodeDrawerMesh);
+    // Pedestal Frame (Hollow slot)
+    const pedOuter = new THREE.Mesh(new THREE.BoxGeometry(pedW, pedH, pedD), deskWood);
+    pedOuter.position.set(pedX, pedH / 2, 0);
+    pedOuter.castShadow = true;
+    pedOuter.receiveShadow = true;
+    deskGroup.add(pedOuter);
 
-    const cHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.2, 12), handleMat);
+    // تجويف فتحة الدرج العلوية
+    const drawerSlot = new THREE.Mesh(new THREE.BoxGeometry(pedW - 0.08, 0.38, pedD - 0.06), innerDeskWood);
+    drawerSlot.position.set(pedX, 1.1, 0.03);
+    deskGroup.add(drawerSlot);
+
+    // مجسم الدرج المنزلق 3D الكامل (له وجه + قاع + جوانب ينزلق للأمام!)
+    const drawerBoxGroup = new THREE.Group();
+    drawerBoxGroup.position.set(pedX, 1.1, pedD / 2);
+
+    const dW = pedW - 0.08;
+    const dH = 0.34;
+    const dDepth = 0.85;
+
+    // Face
+    const dFace = new THREE.Mesh(new THREE.BoxGeometry(dW, dH, 0.04), new THREE.MeshStandardMaterial({ color: 0x654321, roughness: 0.4 }));
+    dFace.position.set(0, 0, 0);
+    dFace.castShadow = true;
+    drawerBoxGroup.add(dFace);
+
+    // Handle
+    const cHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.22, 12), handleMat);
     cHandle.rotation.z = Math.PI / 2;
-    cHandle.position.set(0, 0, 0.04);
-    commodeDrawerMesh.add(cHandle);
-    deskGroup.add(commodeDrawerPivot);
+    cHandle.position.set(0, 0, 0.035);
+    dFace.add(cHandle);
 
-    this.registerDrawer('desk_commode_drawer', commodeDrawerPivot, commodeDrawerMesh, {
+    // Drawer Sides & Bottom (Visible when drawer pulls out!)
+    const dSideL = new THREE.Mesh(new THREE.BoxGeometry(0.02, dH - 0.04, dDepth), innerDeskWood);
+    dSideL.position.set(-dW / 2 + 0.02, -0.02, -dDepth / 2);
+    drawerBoxGroup.add(dSideL);
+
+    const dSideR = new THREE.Mesh(new THREE.BoxGeometry(0.02, dH - 0.04, dDepth), innerDeskWood);
+    dSideR.position.set(dW / 2 - 0.02, -0.02, -dDepth / 2);
+    drawerBoxGroup.add(dSideR);
+
+    const dBottom = new THREE.Mesh(new THREE.BoxGeometry(dW, 0.02, dDepth), innerDeskWood);
+    dBottom.position.set(0, -dH / 2 + 0.02, -dDepth / 2);
+    drawerBoxGroup.add(dBottom);
+
+    // Papers & Stationery inside the drawer!
+    const papers = new THREE.Mesh(
+      new THREE.BoxGeometry(dW - 0.1, 0.06, dDepth - 0.2),
+      new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.7 })
+    );
+    papers.position.set(0, -dH / 2 + 0.05, -dDepth / 2);
+    drawerBoxGroup.add(papers);
+
+    deskGroup.add(drawerBoxGroup);
+
+    this.registerDrawer('desk_commode_drawer', drawerBoxGroup, dFace, {
       id: 'drawers',
-      name: 'درج كمودينو مكتب أبونا — اضغط للفتح 3D',
+      name: 'درج مكتب أبونا — اضغط مرتين للسحب في 3D',
       section: 'services',
       focusPos: new THREE.Vector3(1.2, 2.2, 0.5),
       focusLookAt: new THREE.Vector3(2.6, 1.4, 0.5)
-    }, 0.35);
+    }, 0.55);
 
     // كرسي أبونا
     const abounaChair = new THREE.Group();
     abounaChair.position.set(0, 0, 0.65);
     const aSeat = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.12, 0.8), leatherMat);
-    aSeat.position.set(0, 1.1, 0);
+    aSeat.position.set(0, 0.85, 0);
+    aSeat.castShadow = true;
     abounaChair.add(aSeat);
-    const aBack = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.2, 0.14), leatherMat);
-    aBack.position.set(0, 1.7, 0.35);
+
+    const aBack = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.1, 0.14), leatherMat);
+    aBack.position.set(0, 1.4, 0.35);
+    aBack.castShadow = true;
     abounaChair.add(aBack);
     deskGroup.add(abounaChair);
 
-    // كرسيين للزوار
+    // كرسيين للزوار أمام المكتب
     const vChair1 = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.65), leatherMat);
-    vChair1.position.set(-0.6, 0.7, -1.05);
+    vChair1.position.set(-0.6, 0.55, -0.95);
+    vChair1.castShadow = true;
     deskGroup.add(vChair1);
 
     const vChair2 = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.65), leatherMat);
-    vChair2.position.set(0.6, 0.7, -1.05);
+    vChair2.position.set(0.6, 0.55, -0.95);
+    vChair2.castShadow = true;
     deskGroup.add(vChair2);
 
-    // اللابتوب (شاشة اللابتوب تفتح وتغلق!)
+    // اللابتوب على سطح المكتب
     const laptopGroup = new THREE.Group();
-    laptopGroup.position.set(-0.25, 1.86, 0);
-    const lBase = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.02, 0.5), new THREE.MeshStandardMaterial({ color: 0x90a4ae, metalness: 0.8 }));
+    laptopGroup.position.set(-0.25, 1.55, 0);
+    const lBase = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.02, 0.46), new THREE.MeshStandardMaterial({ color: 0x78909c, metalness: 0.85 }));
+    lBase.castShadow = true;
     laptopGroup.add(lBase);
 
     const lScreenPivot = new THREE.Group();
-    lScreenPivot.position.set(0, 0.01, 0.25);
+    lScreenPivot.position.set(0, 0.01, 0.23);
     lScreenPivot.rotation.x = Math.PI / 10;
-    const lScreen = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.48, 0.02), new THREE.MeshStandardMaterial({ color: 0x90a4ae, metalness: 0.8 }));
-    lScreen.position.set(0, 0.24, 0);
+    const lScreen = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.44, 0.02), new THREE.MeshStandardMaterial({ color: 0x78909c, metalness: 0.85 }));
+    lScreen.position.set(0, 0.22, 0);
     lScreenPivot.add(lScreen);
 
-    const lDisplay = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.42), new THREE.MeshStandardMaterial({ color: 0x1e3a8a, emissive: 0x2563eb, emissiveIntensity: 0.5 }));
-    lDisplay.position.set(0, 0.24, -0.012);
+    const lDisplay = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.6, 0.38),
+      new THREE.MeshStandardMaterial({ color: 0x1e3a8a, emissive: 0x2563eb, emissiveIntensity: 0.6 })
+    );
+    lDisplay.position.set(0, 0.22, -0.012);
     lDisplay.rotation.y = Math.PI;
     lScreenPivot.add(lDisplay);
     laptopGroup.add(lScreenPivot);
 
     lBase.userData = {
       id: 'laptop',
-      name: 'اللابتوب على مكتب أبونا (معرض الأعمال)',
+      name: 'لابتوب أبونا (عرض الأعمال والمواقع)',
       section: 'showcase',
-      focusPos: new THREE.Vector3(1.4, 2.5, 0.5),
-      focusLookAt: new THREE.Vector3(2.6, 1.9, 0.5)
+      focusPos: new THREE.Vector3(1.7, 2.2, 0.5),
+      focusLookAt: new THREE.Vector3(2.4, 1.6, 0.5)
     };
-    lScreen.userData = lBase.userData;
-    lDisplay.userData = lBase.userData;
-    this.interactables.push(lBase, lScreen, lDisplay);
+    this.interactables.push(lBase);
     deskGroup.add(laptopGroup);
 
-    // أباجورة المكتب
+    // أباجورة المكتب (تبديل وضع النهار/الليل)
     const lampGroup = new THREE.Group();
-    lampGroup.position.set(0.85, 1.86, 0.2);
-    const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.04, 20), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8 }));
+    lampGroup.position.set(0.85, 1.55, -0.2);
+    const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.06, 16), handleMat);
+    lampBase.castShadow = true;
     lampGroup.add(lampBase);
 
-    const lampShade = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.28, 20, 1, true), new THREE.MeshStandardMaterial({ color: 0x1b4332, roughness: 0.4 }));
-    lampShade.position.set(0, 0.75, 0);
-    lampShade.rotation.x = Math.PI;
+    const lampPole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.5, 12), handleMat);
+    lampPole.position.set(0, 0.28, 0);
+    lampGroup.add(lampPole);
+
+    const lampShade = new THREE.Mesh(
+      new THREE.ConeGeometry(0.24, 0.32, 16, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0xfff8e7, roughness: 0.3, side: THREE.DoubleSide })
+    );
+    lampShade.position.set(0, 0.52, 0);
     lampGroup.add(lampShade);
 
     this.lampBulbMat = new THREE.MeshStandardMaterial({ color: 0xffe082, emissive: 0xffb74d, emissiveIntensity: 0.8 });
-    const lampBulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), this.lampBulbMat);
-    lampBulb.position.set(0, 0.7, 0);
+    const lampBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), this.lampBulbMat);
+    lampBulb.position.set(0, 0.48, 0);
     lampGroup.add(lampBulb);
 
     lampBase.userData = {
       id: 'lamp',
-      name: 'أباجورة المكتب (تبديل نهار/ليل)',
+      name: 'أباجورة المكتب (اضغط لتبديل النهار/الليل)',
       section: 'lamp_toggle'
     };
     lampShade.userData = lampBase.userData;
     this.interactables.push(lampBase, lampShade);
     deskGroup.add(lampGroup);
 
-    // التليفون
+    // التليفون الأرضي
     const phoneGroup = new THREE.Group();
-    phoneGroup.position.set(-0.85, 1.86, -0.15);
-    const phoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.1, 0.35), new THREE.MeshStandardMaterial({ color: 0x2c3e50 }));
+    phoneGroup.position.set(-0.85, 1.55, -0.15);
+    const phoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.09, 0.32), new THREE.MeshStandardMaterial({ color: 0x263238 }));
+    phoneBase.castShadow = true;
     phoneGroup.add(phoneBase);
 
     phoneBase.userData = {
       id: 'phone',
       name: 'تليفون المكتب (تواصل مباشر)',
       section: 'contact',
-      focusPos: new THREE.Vector3(1.2, 2.5, 0.5),
-      focusLookAt: new THREE.Vector3(2.6, 1.9, 0.5)
+      focusPos: new THREE.Vector3(1.2, 2.3, 0.5),
+      focusLookAt: new THREE.Vector3(2.6, 1.6, 0.5)
     };
     this.interactables.push(phoneBase);
     deskGroup.add(phoneGroup);
@@ -654,45 +866,98 @@ class OfficeScene {
 
   // ==========================================
   // 3. الحائط المقابل لحائط الباب (الجنوب):
-  // الدولاب الكبير 3 أجزاء:
-  // - كل ضلفة فيه (بوكسات، قزاز، درجين، طوال) تفتح بفيزياء 3D!
+  // الدولاب الكبير 3 أجزاء بتجويف حقيقي وأعماق ملموسة ورفوف وأدراج:
+  // - اليسار: ضرفتين طوال من تحت + بوكسين من فوق
+  // - الوسط: درجين من تحت ينزلقان + ضرفتين قزاز للدروع والشهادات + بوكسين
+  // - اليمين: 4 أرفف مكتبة + بوكسين من فوق
   // ==========================================
   buildGrandThreeSectionCabinet() {
     const cabinetGroup = new THREE.Group();
     cabinetGroup.position.set(0, 0, 4.0);
     cabinetGroup.rotation.y = Math.PI;
 
-    const woodDark = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.5 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x81d4fa, roughness: 0.1, transparent: true, opacity: 0.45 });
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.8 });
+    const woodDark = new THREE.MeshStandardMaterial({ color: 0x4a2e2b, roughness: 0.48 });
+    const woodInner = new THREE.MeshStandardMaterial({ color: 0x361f1c, roughness: 0.65 });
+    const woodDoor = new THREE.MeshStandardMaterial({ color: 0x5a3733, roughness: 0.42 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x90caf9, roughness: 0.08, transparent: true, opacity: 0.42 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.85 });
 
     const totalW = 6.2;
     const totalH = 4.0;
     const depth = 0.75;
     const secW = totalW / 3;
 
-    // Frame
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(totalW, totalH, depth), woodDark);
-    frame.position.set(0, totalH / 2, 0);
-    frame.castShadow = true;
-    frame.receiveShadow = true;
-    cabinetGroup.add(frame);
+    // Contact shadow
+    cabinetGroup.add(this.createContactShadow(totalW + 0.4, depth + 0.4, 0.5));
+
+    // Outer Hollow Cabinet Frame (Shows full 75cm depth!)
+    // 1. Back Wall
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(totalW, totalH, 0.04), woodInner);
+    backWall.position.set(0, totalH / 2, -depth / 2 + 0.02);
+    backWall.receiveShadow = true;
+    cabinetGroup.add(backWall);
+
+    // 2. Left & Right Outer Walls (full 75cm depth)
+    const outerL = new THREE.Mesh(new THREE.BoxGeometry(0.05, totalH, depth), woodDark);
+    outerL.position.set(-totalW / 2 + 0.025, totalH / 2, 0);
+    outerL.castShadow = true;
+    outerL.receiveShadow = true;
+    cabinetGroup.add(outerL);
+
+    const outerR = new THREE.Mesh(new THREE.BoxGeometry(0.05, totalH, depth), woodDark);
+    outerR.position.set(totalW / 2 - 0.025, totalH / 2, 0);
+    outerR.castShadow = true;
+    outerR.receiveShadow = true;
+    cabinetGroup.add(outerR);
+
+    // 3. Top & Bottom Plinths
+    const topBoard = new THREE.Mesh(new THREE.BoxGeometry(totalW, 0.06, depth), woodDark);
+    topBoard.position.set(0, totalH - 0.03, 0);
+    topBoard.castShadow = true;
+    cabinetGroup.add(topBoard);
+
+    const bottomBoard = new THREE.Mesh(new THREE.BoxGeometry(totalW, 0.08, depth), woodDark);
+    bottomBoard.position.set(0, 0.04, 0);
+    bottomBoard.receiveShadow = true;
+    cabinetGroup.add(bottomBoard);
+
+    // 4. Two Major Vertical Partitions separating the 3 Sections (Running full depth!)
+    const part1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, totalH, depth - 0.04), woodDark);
+    part1.position.set(-secW / 2, totalH / 2, 0);
+    part1.castShadow = true;
+    part1.receiveShadow = true;
+    cabinetGroup.add(part1);
+
+    const part2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, totalH, depth - 0.04), woodDark);
+    part2.position.set(secW / 2, totalH / 2, 0);
+    part2.castShadow = true;
+    part2.receiveShadow = true;
+    cabinetGroup.add(part2);
+
+    // 5. Horizontal Divider separating Top Boxes from Lower Sections
+    const boxH = 0.9;
+    const boxDividerY = totalH - boxH - 0.04;
+    const hDivider = new THREE.Mesh(new THREE.BoxGeometry(totalW - 0.1, 0.04, depth - 0.04), woodDark);
+    hDivider.position.set(0, boxDividerY, 0);
+    hDivider.castShadow = true;
+    hDivider.receiveShadow = true;
+    cabinetGroup.add(hDivider);
 
     // =========================================
-    // الصف العلوي: 6 ضلف بوكس مربعة (تفتح جميعها!)
+    // الصف العلوي: 6 ضلف بوكس مربعة مع تجويف داخلي عميق
     // =========================================
-    const boxH = 0.9;
-    const boxY = totalH - boxH / 2 - 0.08;
+    const boxY = boxDividerY + boxH / 2 + 0.02;
 
     for (let sec = 0; sec < 3; sec++) {
       const centerX = (sec - 1) * secW;
       const bDoorW = secW / 2 - 0.04;
 
-      // بوكس يسار السيكشن
+      // بوكس يسار
       const boxPL = new THREE.Group();
-      boxPL.position.set(centerX - secW / 2 + 0.02, boxY, depth / 2 + 0.02);
-      const bL = new THREE.Mesh(new THREE.BoxGeometry(bDoorW, boxH, 0.05), new THREE.MeshStandardMaterial({ color: 0x5d4037 }));
+      boxPL.position.set(centerX - secW / 2 + 0.02, boxY, depth / 2);
+      const bL = new THREE.Mesh(new THREE.BoxGeometry(bDoorW, boxH - 0.02, 0.04), woodDoor);
       bL.position.set(bDoorW / 2, 0, 0);
+      bL.castShadow = true;
       boxPL.add(bL);
       cabinetGroup.add(boxPL);
 
@@ -704,11 +969,12 @@ class OfficeScene {
         focusLookAt: new THREE.Vector3(centerX * -1, 3.2, 4.0)
       });
 
-      // بوكس يمين السيكشن
+      // بوكس يمين
       const boxPR = new THREE.Group();
-      boxPR.position.set(centerX + secW / 2 - 0.02, boxY, depth / 2 + 0.02);
-      const bR = new THREE.Mesh(new THREE.BoxGeometry(bDoorW, boxH, 0.05), new THREE.MeshStandardMaterial({ color: 0x5d4037 }));
+      boxPR.position.set(centerX + secW / 2 - 0.02, boxY, depth / 2);
+      const bR = new THREE.Mesh(new THREE.BoxGeometry(bDoorW, boxH - 0.02, 0.04), woodDoor);
       bR.position.set(-bDoorW / 2, 0, 0);
+      bR.castShadow = true;
       boxPR.add(bR);
       cabinetGroup.add(boxPR);
 
@@ -722,16 +988,34 @@ class OfficeScene {
     }
 
     // =========================================
-    // السيكشن الأيسر: ضرفتين طوال من تحت (تفتحان!)
+    // السيكشن الأيسر: ضرفتين طوال من تحت مع تجويف ورفوف داخلية
     // =========================================
     const leftSecX = -secW;
-    const tallH = totalH - boxH - 0.25;
+    const tallH = boxDividerY - 0.08;
     const tallDoorW = secW / 2 - 0.04;
 
+    // رفوف داخلية في السيكشن الأيسر (بعمق 70 سم!)
+    for (let r = 1; r <= 3; r++) {
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.03, depth - 0.08), woodInner);
+      sh.position.set(leftSecX, r * (tallH / 4) + 0.05, 0);
+      sh.castShadow = true;
+      sh.receiveShadow = true;
+      cabinetGroup.add(sh);
+
+      // ملفات ومجلدات على الرف بعمق حقيقي
+      const folder = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.35, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.6 })
+      );
+      folder.position.set(leftSecX - 0.4, r * (tallH / 4) + 0.24, 0);
+      cabinetGroup.add(folder);
+    }
+
     const leftTallPL = new THREE.Group();
-    leftTallPL.position.set(leftSecX - secW / 2 + 0.02, tallH / 2 + 0.05, depth / 2 + 0.02);
-    const leftTallL = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41 }));
+    leftTallPL.position.set(leftSecX - secW / 2 + 0.02, tallH / 2 + 0.06, depth / 2);
+    const leftTallL = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH - 0.02, 0.04), woodDoor);
     leftTallL.position.set(tallDoorW / 2, 0, 0);
+    leftTallL.castShadow = true;
     leftTallPL.add(leftTallL);
     cabinetGroup.add(leftTallPL);
 
@@ -744,112 +1028,141 @@ class OfficeScene {
     });
 
     const leftTallPR = new THREE.Group();
-    leftTallPR.position.set(leftSecX + secW / 2 - 0.02, tallH / 2 + 0.05, depth / 2 + 0.02);
-    const leftTallR = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41 }));
+    leftTallPR.position.set(leftSecX + secW / 2 - 0.02, tallH / 2 + 0.06, depth / 2);
+    const leftTallR = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH - 0.02, 0.04), woodDoor);
     leftTallR.position.set(-tallDoorW / 2, 0, 0);
+    leftTallR.castShadow = true;
     leftTallPR.add(leftTallR);
     cabinetGroup.add(leftTallPR);
 
     this.registerDoor('grand_tall_left_R', leftTallPR, 'right', leftTallR, {
       id: 'bookshelf',
-      name: 'ضلفة الدولاب الطويلة (يسار) — اضغط للفتح 3D',
+      name: 'ضلفة الدولاب الطويلة (يمين) — اضغط للفتح 3D',
       section: 'projects',
       focusPos: new THREE.Vector3(1.8, 2.0, 1.8),
       focusLookAt: new THREE.Vector3(2.0, 1.8, 4.0)
     });
 
     // =========================================
-    // السيكشن الأيمن: ضرفتين طوال من تحت (تفتحان!)
+    // السيكشن الأيمن: 4 رفوف مكتبة مفتوحة تملأها الكتب بعمق حقيقي
     // =========================================
     const rightSecX = secW;
+    const rShelfCount = 4;
+    const rShelfSpacing = tallH / (rShelfCount + 1);
 
-    const rightTallPL = new THREE.Group();
-    rightTallPL.position.set(rightSecX - secW / 2 + 0.02, tallH / 2 + 0.05, depth / 2 + 0.02);
-    const rightTallL = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41 }));
-    rightTallL.position.set(tallDoorW / 2, 0, 0);
-    rightTallPL.add(rightTallL);
-    cabinetGroup.add(rightTallPL);
+    for (let s = 1; s <= rShelfCount; s++) {
+      const shY = s * rShelfSpacing + 0.05;
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.035, depth - 0.06), woodDark);
+      sh.position.set(rightSecX, shY, 0);
+      sh.castShadow = true;
+      sh.receiveShadow = true;
+      cabinetGroup.add(sh);
 
-    this.registerDoor('grand_tall_right_L', rightTallPL, 'left', rightTallL, {
-      id: 'bookshelf',
-      name: 'ضلفة الدولاب الطويلة (يمين) — اضغط للفتح 3D',
-      section: 'projects',
-      focusPos: new THREE.Vector3(-1.8, 2.0, 1.8),
-      focusLookAt: new THREE.Vector3(-2.0, 1.8, 4.0)
-    });
+      // صفوف كتب واقعية بألوان وعناوين وأعماق ملموسة
+      const bookColors = [0x8b0000, 0x1b4d3e, 0x2e4053, 0xb7950b, 0x4a235a, 0x7e5109];
+      let currX = rightSecX - secW / 2 + 0.15;
 
-    const rightTallPR = new THREE.Group();
-    rightTallPR.position.set(rightSecX + secW / 2 - 0.02, tallH / 2 + 0.05, depth / 2 + 0.02);
-    const rightTallR = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH, 0.05), new THREE.MeshStandardMaterial({ color: 0x6d4c41 }));
-    rightTallR.position.set(-tallDoorW / 2, 0, 0);
-    rightTallPR.add(rightTallR);
-    cabinetGroup.add(rightTallPR);
+      while (currX < rightSecX + secW / 2 - 0.2) {
+        const bW = 0.055 + Math.random() * 0.04;
+        const bH = 0.38 + Math.random() * 0.12;
+        const bD = depth * 0.65;
+        const bMat = new THREE.MeshStandardMaterial({
+          color: bookColors[Math.floor(Math.random() * bookColors.length)],
+          roughness: 0.55
+        });
 
-    this.registerDoor('grand_tall_right_R', rightTallPR, 'right', rightTallR, {
-      id: 'bookshelf',
-      name: 'ضلفة الدولاب الطويلة (يمين) — اضغط للفتح 3D',
-      section: 'projects',
-      focusPos: new THREE.Vector3(-1.8, 2.0, 1.8),
-      focusLookAt: new THREE.Vector3(-2.0, 1.8, 4.0)
-    });
+        const book = new THREE.Mesh(new THREE.BoxGeometry(bW, bH, bD), bMat);
+        book.position.set(currX + bW / 2, shY + bH / 2 + 0.018, 0);
+        book.castShadow = true;
+        book.receiveShadow = true;
+        cabinetGroup.add(book);
+
+        currX += bW + 0.015;
+      }
+    }
 
     // =========================================
-    // السيكشن الأوسط (المميز):
-    // - درجين تحت القزاز (ينزلقان للأمام في 3D!)
-    // - ضرفتين قزاز (تفتحان بنعومة لتكشف الدروع والشهادات!)
+    // السيكشن الأوسط: درجين من تحت ينزلقان + ضرفتين قزاز للدروع والشهادات
     // =========================================
     const midSecX = 0;
-    const drawersH = 0.85;
-    const glassH = tallH - drawersH - 0.1;
+    const drawersH = 1.05;
+    const glassH = tallH - drawersH;
 
-    // الدرج الأول السفلي
+    // رف فاصل أفقي فوق الدرجين
+    const midDivider = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.04, depth - 0.04), woodDark);
+    midDivider.position.set(midSecX, drawersH + 0.05, 0);
+    midDivider.castShadow = true;
+    cabinetGroup.add(midDivider);
+
+    // الدرج السفلي 3D المنزلق
     const drawer1Group = new THREE.Group();
-    drawer1Group.position.set(midSecX, 0.28, depth / 2 + 0.02);
-    const d1Mesh = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.38, 0.05), new THREE.MeshStandardMaterial({ color: 0x795548 }));
-    drawer1Group.add(d1Mesh);
+    drawer1Group.position.set(midSecX, 0.32, depth / 2);
+    const d1Face = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.44, 0.04), woodDoor);
+    d1Face.castShadow = true;
+    drawer1Group.add(d1Face);
 
-    const d1Handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
-    d1Handle.rotation.z = Math.PI / 2;
-    d1Handle.position.set(0, 0, 0.04);
-    d1Mesh.add(d1Handle);
+    const d1SideL = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.36, depth - 0.1), woodInner);
+    d1SideL.position.set(-secW / 2 + 0.06, 0, -depth / 2 + 0.05);
+    drawer1Group.add(d1SideL);
+    const d1SideR = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.36, depth - 0.1), woodInner);
+    d1SideR.position.set(secW / 2 - 0.06, 0, -depth / 2 + 0.05);
+    drawer1Group.add(d1SideR);
+
+    const d1H = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
+    d1H.rotation.z = Math.PI / 2;
+    d1H.position.set(0, 0, 0.035);
+    d1Face.add(d1H);
     cabinetGroup.add(drawer1Group);
 
-    this.registerDrawer('grand_drawer_1', drawer1Group, d1Mesh, {
+    this.registerDrawer('grand_mid_drawer_1', drawer1Group, d1Face, {
       id: 'drawers',
-      name: 'درج الخدمات والتحميلات (1) — اضغط للفتح 3D',
+      name: 'درج الخدمات والمستندات (السفلي) — اضغط للفتح 3D',
       section: 'services',
       focusPos: new THREE.Vector3(0, 1.8, 1.6),
-      focusLookAt: new THREE.Vector3(0, 1.0, 4.0)
-    }, 0.45);
+      focusLookAt: new THREE.Vector3(0, 0.4, 4.0)
+    }, 0.55);
 
-    // الدرج الثاني العلوي
+    // الدرج العلوي 3D المنزلق
     const drawer2Group = new THREE.Group();
-    drawer2Group.position.set(midSecX, 0.72, depth / 2 + 0.02);
-    const d2Mesh = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.38, 0.05), new THREE.MeshStandardMaterial({ color: 0x795548 }));
-    drawer2Group.add(d2Mesh);
+    drawer2Group.position.set(midSecX, 0.78, depth / 2);
+    const d2Face = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.44, 0.04), woodDoor);
+    d2Face.castShadow = true;
+    drawer2Group.add(d2Face);
 
-    const d2Handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
-    d2Handle.rotation.z = Math.PI / 2;
-    d2Handle.position.set(0, 0, 0.04);
-    d2Mesh.add(d2Handle);
+    const d2H = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 12), handleMat);
+    d2H.rotation.z = Math.PI / 2;
+    d2H.position.set(0, 0, 0.035);
+    d2Face.add(d2H);
     cabinetGroup.add(drawer2Group);
 
-    this.registerDrawer('grand_drawer_2', drawer2Group, d2Mesh, {
+    this.registerDrawer('grand_mid_drawer_2', drawer2Group, d2Face, {
       id: 'drawers',
-      name: 'درج الملفات المجانية (2) — اضغط للفتح 3D',
+      name: 'درج العهود والسجلات (العلوي) — اضغط للفتح 3D',
       section: 'services',
       focusPos: new THREE.Vector3(0, 1.8, 1.6),
-      focusLookAt: new THREE.Vector3(0, 1.0, 4.0)
-    }, 0.45);
+      focusLookAt: new THREE.Vector3(0, 0.8, 4.0)
+    }, 0.55);
 
-    // ضرفتين قزاز في النص
+    // ضرفتين قزاز فوق الدرجين (لعرض الدروع والشهادات)
     const glassDoorW = secW / 2 - 0.04;
-    const glassY = drawersH + glassH / 2 + 0.08;
+    const glassY = drawersH + glassH / 2 + 0.06;
 
-    // ضلفة قزاز شمال
+    // رفوف زجاجية داخلية لعرض الدروع
+    for (let r = 1; r <= 3; r++) {
+      const gShelf = new THREE.Mesh(new THREE.BoxGeometry(secW - 0.08, 0.02, depth - 0.1), glassMat);
+      gShelf.position.set(midSecX, drawersH + r * (glassH / 4) + 0.05, 0);
+      cabinetGroup.add(gShelf);
+
+      // دروع ذهبية وفضية داخلية ثلاثية الأبعاد
+      const award = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.28, 12), handleMat);
+      award.position.set(midSecX + (r - 2) * 0.45, drawersH + r * (glassH / 4) + 0.2, 0);
+      award.castShadow = true;
+      cabinetGroup.add(award);
+    }
+
     const glassPL = new THREE.Group();
-    glassPL.position.set(midSecX - secW / 2 + 0.02, glassY, depth / 2 + 0.02);
-    const gDoorL = new THREE.Mesh(new THREE.BoxGeometry(glassDoorW, glassH, 0.03), glassMat);
+    glassPL.position.set(midSecX - secW / 2 + 0.02, glassY, depth / 2);
+    const gDoorL = new THREE.Mesh(new THREE.BoxGeometry(glassDoorW, glassH - 0.02, 0.03), glassMat);
     gDoorL.position.set(glassDoorW / 2, 0, 0);
     glassPL.add(gDoorL);
     cabinetGroup.add(glassPL);
@@ -862,10 +1175,9 @@ class OfficeScene {
       focusLookAt: new THREE.Vector3(0, 2.1, 4.0)
     });
 
-    // ضلفة قزاز يمين
     const glassPR = new THREE.Group();
-    glassPR.position.set(midSecX + secW / 2 - 0.02, glassY, depth / 2 + 0.02);
-    const gDoorR = new THREE.Mesh(new THREE.BoxGeometry(glassDoorW, glassH, 0.03), glassMat);
+    glassPR.position.set(midSecX + secW / 2 - 0.02, glassY, depth / 2);
+    const gDoorR = new THREE.Mesh(new THREE.BoxGeometry(glassDoorW, glassH - 0.02, 0.03), glassMat);
     gDoorR.position.set(-glassDoorW / 2, 0, 0);
     glassPR.add(gDoorR);
     cabinetGroup.add(glassPR);
@@ -878,61 +1190,96 @@ class OfficeScene {
       focusLookAt: new THREE.Vector3(0, 2.1, 4.0)
     });
 
-    // مقتنيات ذهبية تظهر وراء القزاز
-    for (let r = 1; r <= 3; r++) {
-      const award = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.28, 12), handleMat);
-      award.position.set(midSecX + (r - 2) * 0.45, drawersH + r * 0.45, depth / 2 - 0.1);
-      cabinetGroup.add(award);
-    }
-
     this.scene.add(cabinetGroup);
   }
 
   // ==========================================
   // 4. الحائط المقابل للمكتب (الشمال الغربي):
   // دولاب كبير 4 ضلف قزاز من فوق + 4 ضلف مكعبين من تحت
-  // كل واحدة من الـ 8 ضلف تفتح بمفصلتها الخاصة في 3D!
+  // بتجويف داخلي عميق (65 سم) ورفوف كاملة بالكتب ثلاثية الأبعاد!
   // ==========================================
   buildFourGlassLibraryCabinet() {
     const libGroup = new THREE.Group();
     libGroup.position.set(-4.5, 0, 0.8);
     libGroup.rotation.y = Math.PI / 2;
 
-    const woodDark = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.5 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x81d4fa, roughness: 0.1, transparent: true, opacity: 0.5 });
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.8 });
+    const woodDark = new THREE.MeshStandardMaterial({ color: 0x4a2e2b, roughness: 0.48 });
+    const woodInner = new THREE.MeshStandardMaterial({ color: 0x361f1c, roughness: 0.65 });
+    const woodDoor = new THREE.MeshStandardMaterial({ color: 0x5a3733, roughness: 0.42 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x90caf9, roughness: 0.08, transparent: true, opacity: 0.45 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.2, metalness: 0.85 });
 
     const totalW = 4.4;
     const totalH = 3.8;
     const depth = 0.65;
     const doorW = totalW / 4 - 0.03;
 
-    // Frame
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(totalW, totalH, depth), woodDark);
-    frame.position.set(0, totalH / 2, 0);
-    frame.castShadow = true;
-    frame.receiveShadow = true;
-    libGroup.add(frame);
+    // Contact shadow
+    libGroup.add(this.createContactShadow(totalW + 0.3, depth + 0.3, 0.48));
+
+    // Outer Hollow Cabinet Shell (Depth 65cm)
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(totalW, totalH, 0.03), woodInner);
+    backWall.position.set(0, totalH / 2, -depth / 2 + 0.015);
+    backWall.receiveShadow = true;
+    libGroup.add(backWall);
+
+    const outerL = new THREE.Mesh(new THREE.BoxGeometry(0.04, totalH, depth), woodDark);
+    outerL.position.set(-totalW / 2 + 0.02, totalH / 2, 0);
+    outerL.castShadow = true;
+    outerL.receiveShadow = true;
+    libGroup.add(outerL);
+
+    const outerR = new THREE.Mesh(new THREE.BoxGeometry(0.04, totalH, depth), woodDark);
+    outerR.position.set(totalW / 2 - 0.02, totalH / 2, 0);
+    outerR.castShadow = true;
+    outerR.receiveShadow = true;
+    libGroup.add(outerR);
+
+    const topBoard = new THREE.Mesh(new THREE.BoxGeometry(totalW, 0.05, depth), woodDark);
+    topBoard.position.set(0, totalH - 0.025, 0);
+    topBoard.castShadow = true;
+    libGroup.add(topBoard);
+
+    const bottomBoard = new THREE.Mesh(new THREE.BoxGeometry(totalW, 0.08, depth), woodDark);
+    bottomBoard.position.set(0, 0.04, 0);
+    bottomBoard.receiveShadow = true;
+    libGroup.add(bottomBoard);
+
+    // رف فاصل أفقي عريض يفصل الـ 4 مكعبات التحتانيين عن الـ 4 ضلف القزاز
+    const cubeH = 1.2;
+    const midShelf = new THREE.Mesh(new THREE.BoxGeometry(totalW - 0.08, 0.04, depth - 0.03), woodDark);
+    midShelf.position.set(0, cubeH + 0.02, 0);
+    midShelf.castShadow = true;
+    midShelf.receiveShadow = true;
+    libGroup.add(midShelf);
 
     // =========================================
-    // الـ 4 ضلف مكعبين خشب من تحت (تفتح كل منها!)
+    // الـ 4 ضلف مكعبين خشب من تحت مع تجاويف أرشفة
     // =========================================
-    const cubeH = 1.2;
-    const cubeY = cubeH / 2 + 0.05;
+    const cubeY = cubeH / 2 + 0.03;
 
     for (let i = 0; i < 4; i++) {
       const xLeft = -totalW / 2 + i * (doorW + 0.03);
       const isLeftHinged = i % 2 === 0;
 
-      const cubePivot = new THREE.Group();
-      cubePivot.position.set(isLeftHinged ? xLeft : xLeft + doorW, cubeY, depth / 2 + 0.02);
+      // تجويف أرشيف داخلي
+      const archBox = new THREE.Mesh(
+        new THREE.BoxGeometry(doorW - 0.1, 0.4, depth - 0.15),
+        new THREE.MeshStandardMaterial({ color: 0x424242, roughness: 0.7 })
+      );
+      archBox.position.set(xLeft + doorW / 2, cubeY - 0.1, 0);
+      libGroup.add(archBox);
 
-      const cubeDoor = new THREE.Mesh(new THREE.BoxGeometry(doorW, cubeH, 0.05), new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.4 }));
+      const cubePivot = new THREE.Group();
+      cubePivot.position.set(isLeftHinged ? xLeft : xLeft + doorW, cubeY, depth / 2);
+
+      const cubeDoor = new THREE.Mesh(new THREE.BoxGeometry(doorW, cubeH - 0.02, 0.04), woodDoor);
       cubeDoor.position.set(isLeftHinged ? doorW / 2 : -doorW / 2, 0, 0);
+      cubeDoor.castShadow = true;
       cubePivot.add(cubeDoor);
 
-      const h = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.2, 12), handleMat);
-      h.position.set(isLeftHinged ? doorW - 0.06 : -doorW + 0.06, 0, 0.04);
+      const h = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 12), handleMat);
+      h.position.set(isLeftHinged ? doorW - 0.06 : -doorW + 0.06, 0, 0.035);
       cubeDoor.add(h);
 
       libGroup.add(cubePivot);
@@ -947,56 +1294,84 @@ class OfficeScene {
     }
 
     // =========================================
-    // الـ 4 ضلف قزاز من فوق (تفتح كل منها لتظهر كتبها!)
+    // الـ 4 ضلف قزاز من فوق مع 3 أرفف داخلية عميقة محملة بالكتب
     // =========================================
-    const glassH = totalH - cubeH - 0.2;
-    const glassY = cubeH + glassH / 2 + 0.1;
+    const upperH = totalH - cubeH - 0.08;
+    const glassShelfCount = 3;
+    const gShelfSpacing = upperH / (glassShelfCount + 1);
+
+    // 3 رفوف عميقة تمتد على عرض المكتبة
+    for (let s = 1; s <= glassShelfCount; s++) {
+      const shY = cubeH + s * gShelfSpacing;
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(totalW - 0.08, 0.035, depth - 0.06), woodDark);
+      sh.position.set(0, shY, 0);
+      sh.castShadow = true;
+      sh.receiveShadow = true;
+      libGroup.add(sh);
+
+      // صفوف كتب ثلاثية الأبعاد وراء القزاز
+      const libColors = [0x78281f, 0x145a32, 0x1f618d, 0x7d6608, 0x512e5f, 0x6e2c00, 0xd4af37];
+      let currX = -totalW / 2 + 0.15;
+
+      while (currX < totalW / 2 - 0.2) {
+        const bW = 0.05 + Math.random() * 0.04;
+        const bH = 0.35 + Math.random() * 0.14;
+        const bD = depth * 0.65;
+        const bookMat = new THREE.MeshStandardMaterial({
+          color: libColors[Math.floor(Math.random() * libColors.length)],
+          roughness: 0.5
+        });
+
+        const book = new THREE.Mesh(new THREE.BoxGeometry(bW, bH, bD), bookMat);
+        book.position.set(currX + bW / 2, shY + bH / 2 + 0.018, 0);
+        book.castShadow = true;
+        book.receiveShadow = true;
+        libGroup.add(book);
+
+        currX += bW + 0.015;
+      }
+    }
+
+    // الـ 4 ضلف القزاز
+    const glassUpperY = cubeH + upperH / 2 + 0.04;
 
     for (let i = 0; i < 4; i++) {
       const xLeft = -totalW / 2 + i * (doorW + 0.03);
       const isLeftHinged = i % 2 === 0;
 
-      // كتب ملونة داخل كل قسم بالدولاب
-      const bookColors = [0x922b21, 0x1f618d, 0x196f3d, 0xb7950b];
-      for (let s = 1; s <= 3; s++) {
-        const book = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.4, 0.35), new THREE.MeshStandardMaterial({ color: bookColors[(i + s) % 4] }));
-        book.position.set(xLeft + doorW / 2, cubeH + s * 0.58, depth / 2 - 0.15);
-        libGroup.add(book);
-      }
-
-      // ضلفة القزاز مع المفصلة
       const glassPivot = new THREE.Group();
-      glassPivot.position.set(isLeftHinged ? xLeft : xLeft + doorW, glassY, depth / 2 + 0.02);
+      glassPivot.position.set(isLeftHinged ? xLeft : xLeft + doorW, glassUpperY, depth / 2);
 
-      const gDoor = new THREE.Mesh(new THREE.BoxGeometry(doorW, glassH, 0.03), glassMat);
-      gDoor.position.set(isLeftHinged ? doorW / 2 : -doorW / 2, 0, 0);
-      glassPivot.add(gDoor);
+      const glassDoor = new THREE.Mesh(new THREE.BoxGeometry(doorW, upperH - 0.02, 0.03), glassMat);
+      glassDoor.position.set(isLeftHinged ? doorW / 2 : -doorW / 2, 0, 0);
+      glassPivot.add(glassDoor);
 
-      const gHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.25, 12), handleMat);
-      gHandle.position.set(isLeftHinged ? doorW - 0.06 : -doorW + 0.06, 0, 0.04);
-      gDoor.add(gHandle);
+      // Glass door frame border
+      const gFrame = new THREE.Mesh(new THREE.BoxGeometry(doorW, 0.04, 0.035), woodDark);
+      gFrame.position.set(isLeftHinged ? doorW / 2 : -doorW / 2, upperH / 2 - 0.02, 0);
+      glassPivot.add(gFrame);
+
+      const h = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 12), handleMat);
+      h.position.set(isLeftHinged ? doorW - 0.05 : -doorW + 0.05, 0, 0.03);
+      glassDoor.add(h);
 
       libGroup.add(glassPivot);
 
-      this.registerDoor(`library_glass_${i}`, glassPivot, isLeftHinged ? 'left' : 'right', gDoor, {
+      this.registerDoor(`library_glass_${i}`, glassPivot, isLeftHinged ? 'left' : 'right', glassDoor, {
         id: 'library_four_doors',
-        name: `ضلفة مكتبة القزاز (${i + 1}) — اضغط للفتح 3D`,
+        name: `ضلفة المكتبة الزجاجية (${i + 1}) — اضغط للفتح 3D`,
         section: 'projects',
-        focusPos: new THREE.Vector3(-2.2, 2.5, 0.8),
-        focusLookAt: new THREE.Vector3(-4.5, 2.5, 0.8)
+        focusPos: new THREE.Vector3(-2.0, 2.5, 0.8),
+        focusLookAt: new THREE.Vector3(-4.5, 2.4, 0.8)
       });
     }
 
     this.scene.add(libGroup);
   }
 
-  // --- Day / Night Lighting Mode Toggle ---
-  toggleDayNight(forcedMode = null) {
-    if (forcedMode !== null) {
-      this.isNightMode = forcedMode === 'night';
-    } else {
-      this.isNightMode = !this.isNightMode;
-    }
+  // --- Day / Night Lighting Transition ---
+  toggleDayNight() {
+    this.isNightMode = !this.isNightMode;
 
     this.playSound('switch');
     document.body.setAttribute('data-theme', this.isNightMode ? 'night' : 'day');
@@ -1005,19 +1380,21 @@ class OfficeScene {
     if (this.isNightMode) {
       gsap.to(this.scene.background, { r: 0.06, g: 0.08, b: 0.11, duration });
       gsap.to(this.scene.fog.color, { r: 0.06, g: 0.08, b: 0.11, duration });
-      gsap.to(this.ambientLight, { intensity: 0.25, duration });
-      gsap.to(this.sunLight, { intensity: 0.15, duration });
+      gsap.to(this.ambientLight, { intensity: 0.18, duration });
+      gsap.to(this.hemiLight, { intensity: 0.15, duration });
+      gsap.to(this.sunLight, { intensity: 0.1, duration });
       gsap.to(this.lampLight, { intensity: 1.8, distance: 9, duration });
       gsap.to(this.lampBulbMat, { emissiveIntensity: 2.0, duration });
       this.windowGlassMat.color.setHex(0x1e293b);
     } else {
-      gsap.to(this.scene.background, { r: 0.96, g: 0.94, b: 0.90, duration });
-      gsap.to(this.scene.fog.color, { r: 0.96, g: 0.94, b: 0.90, duration });
-      gsap.to(this.ambientLight, { intensity: 0.85, duration });
-      gsap.to(this.sunLight, { intensity: 1.25, duration });
-      gsap.to(this.lampLight, { intensity: 0.4, distance: 7, duration });
+      gsap.to(this.scene.background, { r: 0.96, g: 0.94, b: 0.91, duration });
+      gsap.to(this.scene.fog.color, { r: 0.96, g: 0.94, b: 0.91, duration });
+      gsap.to(this.ambientLight, { intensity: 0.42, duration });
+      gsap.to(this.hemiLight, { intensity: 0.48, duration });
+      gsap.to(this.sunLight, { intensity: 1.35, duration });
+      gsap.to(this.lampLight, { intensity: 0.55, distance: 6.5, duration });
       gsap.to(this.lampBulbMat, { emissiveIntensity: 0.8, duration });
-      this.windowGlassMat.color.setHex(0xbde0fe);
+      this.windowGlassMat.color.setHex(0xcde5ff);
     }
 
     if (window.UI) {
@@ -1071,7 +1448,6 @@ class OfficeScene {
     }
   }
 
-  // --- Toggle Any Door / Drawer 3D Opening ---
   toggleDoor(doorId) {
     const reg = this.doorRegistry[doorId];
     if (!reg) return;
@@ -1095,7 +1471,6 @@ class OfficeScene {
 
     this.activeFocusItem = itemData;
 
-    // تأكيد فتح الضلفة فيزيائياً
     if (itemData.doorId) {
       this.openDoor(itemData.doorId);
     }
@@ -1126,7 +1501,6 @@ class OfficeScene {
     }
   }
 
-  // --- Locate, Guide Camera & Highlight Door with 3D Beacon ---
   locateAndHighlightDoor(item) {
     const targetDoorId = item.doorId;
     let targetObj = null;
@@ -1141,11 +1515,8 @@ class OfficeScene {
     if (!targetObj || !targetObj.userData) return;
 
     const data = targetObj.userData;
-
-    // Focus camera and open door physically
     this.focusOnItem(data);
 
-    // Show Glowing Beacon
     const beacon = document.getElementById('beacon-indicator');
     const beaconLabel = document.getElementById('beacon-label');
 
@@ -1240,12 +1611,11 @@ class OfficeScene {
       return;
     }
 
-    // 1. حساب المسافة للتأكد إذا كان سحب لتوجيه الكاميرا (Drag) أم ضغطة حقيقية (Tap)
     const dx = Math.abs(event.clientX - this.pointerDownPos.x);
     const dy = Math.abs(event.clientY - this.pointerDownPos.y);
     const elapsed = Date.now() - this.pointerDownPos.time;
 
-    // لو المستخدم بيحرك صباعه عشان يلف في الغرفة (أكتر من 8 بيكسل)، نتجاهل الضغطة تماماً!
+    // Ignore drag gestures
     if (dx > 8 || dy > 8 || elapsed > 700) {
       return;
     }
@@ -1277,19 +1647,16 @@ class OfficeScene {
           if (window.UI) window.UI.hideTooltip();
 
           if (isCurrentlyOpen) {
-            // الضلفة مفتوحة -> دوستين يقفلوها ويرجعوا المشهد العام!
             this.closeDoor(data.doorId);
             this.resetCameraOverview();
             if (window.UI) window.UI.closeModal();
           } else {
-            // الضلفة مقفولة -> دوستين يفتحوها فيزيائياً ويقربوا الكاميرا ويعرضوا المحتوى!
             this.focusOnItem(data);
             if (window.UI && data.section) {
               window.UI.openSection(data.section, data.name);
             }
           }
         } else {
-          // اللمسة الأولى: إظهار التنبيه الذكي بالاسم (للفتح أو للغلق)
           this.lastTap = { time: now, itemId: currentId };
           this.playSound('click');
           const actionText = isCurrentlyOpen ? 'اضغط مرتين للغلق ✖' : 'اضغط مرتين للفتح 📂';
