@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>مكتب أبونا — تجربة ثلاثية الأبعاد تفاعلية 3D</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- Three.js + OrbitControls + GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body data-theme="day">
+
+  <!-- 3D Canvas Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Interactive 3D Tooltip Follower -->
+  <div id="tooltip-3d" class="tooltip-3d"></div>
+
+  <!-- UI Overlay Layer -->
+  <div class="ui-overlay">
+    <!-- Header Bar -->
+    <header class="header-bar">
+      <!-- Brand & Title -->
+      <div class="brand-section">
+        <div class="brand-avatar">✝</div>
+        <div class="brand-titles">
+          <h1 id="brand-title">مكتب أبونا</h1>
+          <p id="brand-subtitle">مساحة تفاعلية 3D — استكشف الأعمال، الخدمات، والوثائق</p>
+        </div>
+      </div>
+
+      <!-- Quick Nav Pills -->
+      <nav class="quick-nav" aria-label="أقسام الموقع">
+        <button class="nav-btn" data-section="bio">
+          <span>📖</span> السيرة والشهادات
+        </button>
+        <button class="nav-btn" data-section="projects">
+          <span>📚</span> رف الكتب والمشاريع
+        </button>
+        <button class="nav-btn" data-section="services">
+          <span>🗄️</span> الأدراج والخدمات
+        </button>
+        <button class="nav-btn" data-section="milestones">
+          <span>🖼️</span> الصور والشهادات
+        </button>
+        <button class="nav-btn" data-section="showcase">
+          <span>💻</span> اللابتوب
+        </button>
+        <button class="nav-btn" data-section="contact">
+          <span>☎️</span> تواصل معنا
+        </button>
+      </nav>
+
+      <!-- Search & View Mode Switcher -->
+      <div class="header-search-wrap">
+        <div class="search-input-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="office-search-input" placeholder="ابحث عن أي كتاب، أداة، أو ملف (مثال: توني، أباركة، شهادة)..." autocomplete="off" />
+          <button id="clear-search-btn" class="clear-search-btn" style="display: none;">✕</button>
+        </div>
+        <!-- Search Results Dropdown -->
+        <div id="search-results-dropdown" class="search-results-dropdown"></div>
+      </div>
+
+      <!-- Action Buttons & View Toggle -->
+      <div class="header-actions">
+        <!-- View Mode Switcher (3D vs Cards) -->
+        <button id="view-mode-toggle" class="nav-btn view-switcher-btn" title="التبديل بين المشهد ثلاثي الأبعاد والقوائم السريعة">
+          <span id="view-mode-icon">📋</span>
+          <span id="view-mode-text">عرض البطاقات</span>
+        </button>
+        <button id="theme-toggle-btn" class="action-btn" title="تبديل وضع النهار والليل">☀️</button>
+        <button id="sound-toggle-btn" class="action-btn" title="كتم / تفعيل الصوت">🔊</button>
+      </div>
+    </header>
+
+    <!-- Bottom Guide Prompt -->
+    <div class="scene-guide">
+      <span class="pulse-dot"></span>
+      <span>📱 اضغط مرتين (Double Tap) على أي ضلفة أو درج لفتحها أو غلقها في 3D</span>
+    </div>
+
+    <!-- Floating Reset Overview Button -->
+    <button id="reset-view-btn" class="reset-view-btn">
+      <span>↩</span>
+      <span>الرجوع للمشهد العام</span>
+    </button>
+  </div>
+
+  <!-- =========================================
+       ALTERNATIVE MOBILE CARDS VIEW CONTAINER
+       (طريقة العرض البديلة السريعة للموبايل)
+       ========================================= -->
+  <div id="cards-view-container" class="cards-view-container">
+    <div class="cards-view-header">
+      <div class="cards-view-title-wrap">
+        <h2>📋 دليل محتويات مكتب أبونا الشامل</h2>
+        <p>تصفح سريع ومنظم لجميع دواليب ورفوف وأدوات المكتب بسهولة على الموبايل</p>
+      </div>
+      <button id="close-cards-view-btn" class="modal-close-btn" title="العودة للمشهد 3D">✕</button>
+    </div>
+
+    <!-- Quick Filter Category Tabs -->
+    <div class="cards-category-tabs" id="cards-category-tabs"></div>
+
+    <!-- Categorized Sections and Items List -->
+    <div class="cards-items-list" id="cards-items-list"></div>
+  </div>
+
+  <!-- 3D Beacon / Highlight Marker Indicator -->
+  <div id="beacon-indicator" class="beacon-indicator">
+    <div class="beacon-pulse"></div>
+    <div class="beacon-label" id="beacon-label">📍 هنا مكان الأداة!</div>
+  </div>
+
+  <!-- =========================================
+       GLASSMORPHISM CONTENT MODAL
+       ========================================= -->
+  <div id="modal-backdrop" class="modal-backdrop">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title-area">
+          <h2 id="modal-title">تفاصيل القسم</h2>
+          <p id="modal-subtitle">استكشف المحتويات والملفات</p>
+        </div>
+        <button id="modal-close-btn" class="modal-close-btn" title="إغلاق النافذة">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body">
+        <!-- Dynamic Cards Injected Here by UIController -->
+      </div>
+    </div>
+  </div>
+
+  <!-- App Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/scene.js"></script>
+  <script src="/js/ui.js"></script>
+</body>
+</html>

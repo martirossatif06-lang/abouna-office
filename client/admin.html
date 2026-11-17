@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة تحكم المشهد 3D — مكتب أبونا</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body class="admin-body">
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-avatar" style="width: 38px; height: 38px; font-size: 18px;">✝</div>
+        <div>
+          <strong style="font-size: 1.05rem; display: block;">مكتب أبونا</strong>
+          <span style="font-size: 0.78rem; color: #64748b;">لوحة التحكم الإدارية</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="sidebar-tab-btn active" data-tab="overview">
+          <span class="tab-icon">📊</span>
+          <span>نظرة عامة</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="scene-items">
+          <span class="tab-icon">🛋️</span>
+          <span>عناصر المشهد 3D</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="content">
+          <span class="tab-icon">📚</span>
+          <span>إدارة المحتوى</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="inbox">
+          <span class="tab-icon">📬</span>
+          <span>صندوق الرسائل</span>
+          <span id="sidebar-inbox-badge" class="sidebar-badge">0</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="media">
+          <span class="tab-icon">🖼️</span>
+          <span>مكتبة الوسائط</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="settings">
+          <span class="tab-icon">⚙️</span>
+          <span>إعدادات المشهد</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="/" target="_blank" class="sidebar-tab-btn" style="text-decoration: none; color: var(--accent);">
+          <span class="tab-icon">👁️</span>
+          <span>معاينة المشهد 3D ↗</span>
+        </a>
+        <button id="logout-btn" class="sidebar-tab-btn" style="color: #ef4444;">
+          <span class="tab-icon">🚪</span>
+          <span>تسجيل الخروج</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <div class="admin-title-wrap">
+          <h1>لوحة تحكم مكتب أبونا 3D</h1>
+          <p>تحكم كامل في العناصر، الأقسام، الملفات، ورسائل الزوار مباشرة في المشهد</p>
+        </div>
+        <div class="admin-top-actions">
+          <a href="/" target="_blank" class="card-action-btn" style="text-decoration: none;">
+            <span>فتح الموقع 3D</span> 🌐
+          </a>
+        </div>
+      </header>
+
+      <!-- Stats Cards -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🛋️</div>
+          <div class="stat-info">
+            <h3 id="stat-scene-items">7</h3>
+            <p>عناصر مشهد مفعّلة</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📚</div>
+          <div class="stat-info">
+            <h3 id="stat-total-items">0</h3>
+            <p>إجمالي مشاريع ومحتويات</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📬</div>
+          <div class="stat-info">
+            <h3 id="stat-unread-messages">0</h3>
+            <p>رسائل جديدة واردة</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================
+           TAB 1: OVERVIEW
+           ============================== -->
+      <div id="tab-overview" class="tab-panel active">
+        <div class="admin-card">
+          <div class="card-header-bar">
+            <h2>دليل الاستخدام السريع للمشهد</h2>
+          </div>
+          <div style="line-height: 1.8; color: #475569;">
+            <p>مرحباً بك في لوحة تحكم مكتبك التفاعلي ثلاثي الأبعاد! من هنا يمكنك:</p>
+            <ul style="margin: 14px 24px; display: flex; flex-direction: column; gap: 8px;">
+              <li><strong>عناصر المشهد 3D:</strong> تفعيل أو تعطيل الضلفة، الأدراج، اللابتوب، أو رف الكتب وربط كل منها بقسم معين.</li>
+              <li><strong>إدارة المحتوى:</strong> إضافة كتب جديدة في الرف، تحديث السيرة الذاتية، وإضافة خدمات أو شهادات وصور.</li>
+              <li><strong>صندوق الرسائل:</strong> مراجعة كل الرسائل التي يرسلها الزوار من نموذج التليفون في المكتب مباشرة.</li>
+              <li><strong>مكتبة الوسائط:</strong> رفع ملفات الـ PDF والصور لربطها بالكتب والشهادات.</li>
+              <li><strong>إعدادات المشهد:</strong> تحديد الوضع الافتراضي (نهار أو ليل) وتعديل بيانات التواصل والعنوان.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================
+           TAB 2: SCENE ITEMS
+           ============================== -->
+      <div id="tab-scene-items" class="tab-panel">
+        <div class="admin-card">
+          <div class="card-header-bar">
+            <h2>قطع ومجسمات المشهد 3D</h2>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>اسم القطعة</th>
+                  <th>المعرّف التقني</th>
+                  <th>القسم المرتبط</th>
+                  <th>الوصف التوضيحي (Tooltip)</th>
+                  <th>الحالة (اضغط للتغيير)</th>
+                </tr>
+              </thead>
+              <tbody id="scene-items-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================
+           TAB 3: CONTENT MANAGEMENT
+           ============================== -->
+      <div id="tab-content" class="tab-panel">
+        <div class="admin-card">
+          <div class="card-header-bar">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <h2>محتويات القسم:</h2>
+              <select id="section-select" class="form-input" style="padding: 8px 14px; font-weight: 700;">
+                <option value="bio">📖 السيرة الذاتية والشهادات (الضلفة)</option>
+                <option value="projects">📚 رف الكتب والمشاريع (الكتب)</option>
+                <option value="services">🗄️ الأدراج — الخدمات والتحميلات</option>
+                <option value="milestones">🖼️ الشهادات والصور التذكارية (الحائط)</option>
+                <option value="showcase">💻 معرض اللابتوب الرقمي</option>
+              </select>
+            </div>
+            <button id="add-new-item-btn" class="card-action-btn">
+              <span>+ إضافة عنصر جديد</span>
+            </button>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>العنوان</th>
+                  <th>التصنيف</th>
+                  <th>الشارة</th>
+                  <th>الظهور</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="content-items-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================
+           TAB 4: INBOX / MESSAGES
+           ============================== -->
+      <div id="tab-inbox" class="tab-panel">
+        <div class="admin-card">
+          <div class="card-header-bar">
+            <h2>رسائل الزوار الواردة من تليفون المكتب</h2>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>المرسل</th>
+                  <th>وسيلة التواصل</th>
+                  <th>الموضوع</th>
+                  <th>نص الرسالة</th>
+                  <th>التاريخ</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="messages-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==============================
+           TAB 5: MEDIA LIBRARY
+           ============================== -->
+      <div id="tab-media" class="tab-panel">
+        <div class="admin-card">
+          <div class="card-header-bar">
+            <h2>مكتبة الوسائط والملفات المرفوعة</h2>
+          </div>
+          <div id="media-dropzone" class="dropzone">
+            <input type="file" id="media-file-input" style="display: none;" accept="image/*,application/pdf" />
+            <div style="font-size: 2.5rem; margin-bottom: 10px;">📁</div>
+            <strong style="font-size: 1.1rem; display: block;">اضغط هنا لرفع صور أو ملفات PDF للمشاريع</strong>
+            <span style="color: #64748b; font-size: 0.85rem;">حجم الملف الأقصى: 25 ميجابايت</span>
+          </div>
+
+          <div id="media-grid" class="media-grid"></div>
+        </div>
+      </div>
+
+      <!-- ==============================
+           TAB 6: SETTINGS
+           ============================== -->
+      <div id="tab-settings" class="tab-panel">
+        <div class="admin-card">
+          <div class="card-header-bar">
+            <h2>إعدادات المشهد والموقع العامة</h2>
+          </div>
+          <form id="settings-form" class="contact-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label>عنوان الموقع الرئيسي</label>
+                <input type="text" id="set-office-title" class="form-input" required />
+              </div>
+              <div class="form-group">
+                <label>العنوان الفرعي</label>
+                <input type="text" id="set-office-subtitle" class="form-input" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>النبذة التعريفية (Bio)</label>
+              <textarea id="set-bio" class="form-textarea" rows="3"></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label>الوضع الافتراضي للإضاءة</label>
+                <select id="set-default-mode" class="form-input">
+                  <option value="day">☀️ وضع النهار (Day Mode)</option>
+                  <option value="night">🌙 وضع الليل (Night Mode)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>البريد الإلكتروني للتواصل</label>
+                <input type="email" id="set-contact-email" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>رقم الهاتف / واتساب</label>
+                <input type="text" id="set-contact-phone" class="form-input" />
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label>فيسبوك</label>
+                <input type="text" id="set-social-fb" class="form-input" placeholder="https://..." />
+              </div>
+              <div class="form-group">
+                <label>يوتيوب</label>
+                <input type="text" id="set-social-yt" class="form-input" placeholder="https://..." />
+              </div>
+              <div class="form-group">
+                <label>تيليجرام</label>
+                <input type="text" id="set-social-tg" class="form-input" placeholder="https://..." />
+              </div>
+              <div class="form-group">
+                <label>واتساب مباشر</label>
+                <input type="text" id="set-social-wa" class="form-input" placeholder="https://..." />
+              </div>
+            </div>
+
+            <button type="submit" class="submit-btn" style="width: auto; align-self: flex-start; margin-top: 10px;">
+              <span>حفظ الإعدادات</span> 💾
+            </button>
+          </form>
+        </div>
+
+        <!-- Change Password Box -->
+        <div class="admin-card" style="margin-top: 24px;">
+          <div class="card-header-bar">
+            <h2>تغيير كلمة مرور المشرف</h2>
+          </div>
+          <form id="password-form" class="contact-form" style="max-width: 500px;">
+            <div class="form-group">
+              <label>كلمة المرور الحالية</label>
+              <input type="password" id="cur-password" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label>كلمة المرور الجديدة</label>
+              <input type="password" id="new-password" class="form-input" required minlength="6" />
+            </div>
+            <button type="submit" class="submit-btn" style="width: auto; align-self: flex-start;">
+              <span>تحديث كلمة المرور</span> 🔒
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal for Adding / Editing Content Item -->
+  <div id="item-edit-modal" class="modal-backdrop">
+    <div class="modal-container" style="max-width: 650px;">
+      <div class="modal-header">
+        <h2 id="item-modal-title">إضافة / تعديل عنصر</h2>
+        <button id="item-modal-close" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="item-edit-form" class="contact-form">
+          <input type="hidden" id="edit-item-id" />
+          <div class="form-group">
+            <label>عنوان العنصر / المشروع *</label>
+            <input type="text" id="item-title" class="form-input" required placeholder="مثال: كتاب موسوعة الأخلاق" />
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label>التصنيف</label>
+              <input type="text" id="item-category" class="form-input" placeholder="مؤلفات، أبحاث، مبادرات..." />
+            </div>
+            <div class="form-group">
+              <label>الشارة المميزة (Badge)</label>
+              <input type="text" id="item-badge" class="form-input" placeholder="الأكثر قراءة، حصري..." />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>الوصف والتفاصيل *</label>
+            <textarea id="item-desc" class="form-textarea" rows="3" required placeholder="شرح مبسط لمحتوى هذا العنصر..."></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label>نص زر الإجراء</label>
+              <input type="text" id="item-action-text" class="form-input" placeholder="تحميل PDF، زيارة الرابط..." />
+            </div>
+            <div class="form-group">
+              <label>رابط الملف أو الصفحة (URL)</label>
+              <input type="text" id="item-file-url" class="form-input" placeholder="/uploads/... أو رابط خارجي" />
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label>لون غلاف الكتاب في الرف (للرفوف)</label>
+              <input type="color" id="item-book-color" class="form-input" value="#8b4513" style="height: 48px; padding: 4px;" />
+            </div>
+            <div class="form-group">
+              <label>الوسوم (مفصولة بفاصلة)</label>
+              <input type="text" id="item-tags" class="form-input" placeholder="كتب, فكر, تنمية" />
+            </div>
+          </div>
+          <button type="submit" class="submit-btn">
+            <span>حفظ العنصر</span> ✔
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
