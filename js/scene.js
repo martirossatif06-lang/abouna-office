@@ -312,7 +312,7 @@ class OfficeScene {
 
   // --- Helper to Register an Animated Door ---
   registerDoor(id, pivot, hingeSide, doorMesh, itemData, openAngle = 0.65) {
-    const angle = hingeSide === 'left' ? -Math.PI * openAngle : Math.PI * openAngle;
+    const angle = hingeSide === 'left' ? Math.PI * openAngle : -Math.PI * openAngle;
     this.doorRegistry[id] = {
       pivot: pivot,
       isOpen: false,
@@ -377,7 +377,7 @@ class OfficeScene {
     doorGroup.add(doorPivot);
     this.scene.add(doorGroup);
 
-    this.registerDoor('office_door', doorPivot, 'right', doorLeaf, {
+    this.registerDoor('office_door', doorPivot, 'left', doorLeaf, {
       id: 'office_door',
       name: '🚪 باب المكتب (اضغط للفتح/الغلق)',
       section: 'contact',
@@ -1081,6 +1081,39 @@ class OfficeScene {
       }
     }
 
+    // ضرفتان خشبيتان لمكتبة المؤلفات والمشروعات (تفتحان لتكشفان الكتب بالداخل في 3D!)
+    const rightTallPL = new THREE.Group();
+    rightTallPL.position.set(rightSecX - secW / 2 + 0.02, tallH / 2 + 0.06, depth / 2);
+    const rightTallL = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH - 0.02, 0.04), woodDoor);
+    rightTallL.position.set(tallDoorW / 2, 0, 0);
+    rightTallL.castShadow = true;
+    rightTallPL.add(rightTallL);
+    cabinetGroup.add(rightTallPL);
+
+    this.registerDoor('grand_bookshelf_L', rightTallPL, 'left', rightTallL, {
+      id: 'bookshelf',
+      name: 'مكتبة المؤلفات والمشروعات (يسار) — اضغط للفتح 3D',
+      section: 'projects',
+      focusPos: new THREE.Vector3(-1.8, 2.0, 1.8),
+      focusLookAt: new THREE.Vector3(-2.0, 1.8, 4.0)
+    });
+
+    const rightTallPR = new THREE.Group();
+    rightTallPR.position.set(rightSecX + secW / 2 - 0.02, tallH / 2 + 0.06, depth / 2);
+    const rightTallR = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH - 0.02, 0.04), woodDoor);
+    rightTallR.position.set(-tallDoorW / 2, 0, 0);
+    rightTallR.castShadow = true;
+    rightTallPR.add(rightTallR);
+    cabinetGroup.add(rightTallPR);
+
+    this.registerDoor('grand_bookshelf_R', rightTallPR, 'right', rightTallR, {
+      id: 'bookshelf',
+      name: 'مكتبة المؤلفات والمشروعات (يمين) — اضغط للفتح 3D',
+      section: 'projects',
+      focusPos: new THREE.Vector3(-1.8, 2.0, 1.8),
+      focusLookAt: new THREE.Vector3(-2.0, 1.8, 4.0)
+    });
+
     // =========================================
     // السيكشن الأوسط: درجين من تحت ينزلقان + ضرفتين قزاز للدروع والشهادات
     // =========================================
@@ -1331,6 +1364,39 @@ class OfficeScene {
         currX += bW + 0.015;
       }
     }
+
+    // ضرفتان خشبيتان لمكتبة المؤلفات والمشروعات (تفتحان لتكشفان الكتب بالداخل في 3D!)
+    const rightTallPL = new THREE.Group();
+    rightTallPL.position.set(rightSecX - secW / 2 + 0.02, tallH / 2 + 0.06, depth / 2);
+    const rightTallL = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH - 0.02, 0.04), woodDoor);
+    rightTallL.position.set(tallDoorW / 2, 0, 0);
+    rightTallL.castShadow = true;
+    rightTallPL.add(rightTallL);
+    cabinetGroup.add(rightTallPL);
+
+    this.registerDoor('grand_bookshelf_L', rightTallPL, 'left', rightTallL, {
+      id: 'bookshelf',
+      name: 'مكتبة المؤلفات والمشروعات (يسار) — اضغط للفتح 3D',
+      section: 'projects',
+      focusPos: new THREE.Vector3(-1.8, 2.0, 1.8),
+      focusLookAt: new THREE.Vector3(-2.0, 1.8, 4.0)
+    });
+
+    const rightTallPR = new THREE.Group();
+    rightTallPR.position.set(rightSecX + secW / 2 - 0.02, tallH / 2 + 0.06, depth / 2);
+    const rightTallR = new THREE.Mesh(new THREE.BoxGeometry(tallDoorW, tallH - 0.02, 0.04), woodDoor);
+    rightTallR.position.set(-tallDoorW / 2, 0, 0);
+    rightTallR.castShadow = true;
+    rightTallPR.add(rightTallR);
+    cabinetGroup.add(rightTallPR);
+
+    this.registerDoor('grand_bookshelf_R', rightTallPR, 'right', rightTallR, {
+      id: 'bookshelf',
+      name: 'مكتبة المؤلفات والمشروعات (يمين) — اضغط للفتح 3D',
+      section: 'projects',
+      focusPos: new THREE.Vector3(-1.8, 2.0, 1.8),
+      focusLookAt: new THREE.Vector3(-2.0, 1.8, 4.0)
+    });
 
     // الـ 4 ضلف القزاز
     const glassUpperY = cubeH + upperH / 2 + 0.04;
@@ -1653,7 +1719,9 @@ class OfficeScene {
           } else {
             this.focusOnItem(data);
             if (window.UI && data.section) {
-              window.UI.openSection(data.section, data.name);
+              setTimeout(() => {
+                window.UI.openSection(data.section, data.name);
+              }, 750);
             }
           }
         } else {

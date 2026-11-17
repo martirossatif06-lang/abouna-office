@@ -42,10 +42,16 @@ class UIController {
       this.setupCardsView();
     }
 
-    // Modal Close
+    // Modal Close & Minimize
     document.getElementById('modal-close-btn').addEventListener('click', () => {
       this.closeModal();
     });
+    const minBtn = document.getElementById('modal-minimize-btn');
+    if (minBtn) {
+      minBtn.addEventListener('click', () => {
+        this.closeModal();
+      });
+    }
 
     this.modalBackdrop.addEventListener('click', (e) => {
       if (e.target === this.modalBackdrop) this.closeModal();

@@ -15,15 +15,14 @@ const API = {
     } catch (err) {
       console.log('Using static JSON data fallback...');
       try {
-        // Try relative data path
         const fallbackRes = await fetch('./data/database.json');
         if (fallbackRes.ok) {
           const db = await fallbackRes.json();
           return {
             success: true,
             settings: db.settings || {},
-            items: (db.items || []).filter(i => i.active),
-            sections: (db.sections || []).filter(s => s.active)
+            items: (db.scene_items || []).filter(i => i.is_active !== false),
+            sections: db.sections || {}
           };
         }
       } catch (e2) {
